@@ -6,6 +6,7 @@ import { Onboarding } from "./components/Onboarding";
 import { LoginPage } from "./pages/Login";
 import { SignupPage } from "./pages/Signup";
 import { ForgotPasswordPage } from "./pages/ForgotPassword";
+import { ResetPasswordPage } from "./pages/ResetPassword";
 import { DashboardPage } from "./pages/Dashboard";
 import { UploadPage } from "./pages/Upload";
 import { ReceiptsPage } from "./pages/Receipts";
@@ -28,7 +29,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 export function App() {
-  const { checkAuth } = useStore();
+  const { checkAuth, user, isLoading } = useStore();
   const [showOnboarding, setShowOnboarding] = useState(false);
 
   useEffect(() => {
@@ -36,11 +37,13 @@ export function App() {
   }, [checkAuth]);
 
   useEffect(() => {
-    const done = localStorage.getItem("onboarding-complete");
-    if (!done) {
-      setShowOnboarding(true);
+    if (!isLoading && user) {
+      const done = localStorage.getItem("onboarding-complete");
+      if (!done) {
+        setShowOnboarding(true);
+      }
     }
-  }, []);
+  }, [isLoading, user]);
 
   return (
     <>
@@ -51,6 +54,7 @@ export function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route
           path="/"
           element={

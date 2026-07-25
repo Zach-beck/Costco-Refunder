@@ -56,7 +56,7 @@ export function AlertsPage() {
       {/* Alert list */}
       {loading ? (
         <div className="flex items-center justify-center h-32">
-          <div className="h-6 w-6 animate-spin rounded-full border-3 border-brand-600 border-t-transparent" />
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
         </div>
       ) : alerts.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">

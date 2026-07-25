@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { eq, and, gte, desc } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import {
   receipts,
@@ -342,7 +342,20 @@ export async function receiptRoutes(app: FastifyInstance) {
     "/api/receipts/items/:itemId/stop-tracking",
     { preHandler: [requireAuth] },
     async (request, reply) => {
+      const userId = (request as any).userId;
       const { itemId } = request.params as { itemId: string };
+
+      // Verify ownership
+      const [item] = await db
+        .select({ id: receiptItems.id })
+        .from(receiptItems)
+        .innerJoin(receipts, eq(receiptItems.receiptId, receipts.id))
+        .where(and(eq(receiptItems.id, itemId), eq(receipts.userId, userId)))
+        .limit(1);
+
+      if (!item) {
+        return reply.status(404).send({ success: false, error: "Item not found" });
+      }
 
       await db
         .update(receiptItems)

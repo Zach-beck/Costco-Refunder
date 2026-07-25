@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { eq } from "drizzle-orm";
 import { users, pushSubscriptions, NotificationPrefsSchema } from "@costco-refunder/shared";
 import { db } from "../lib/db.js";
+import { redis } from "../lib/redis.js";
 import { requireAuth, hashPassword, verifyPassword } from "../lib/auth.js";
 import { z } from "zod";
 
@@ -141,7 +142,7 @@ export async function settingsRoutes(app: FastifyInstance) {
     }
   );
 
-  // Password reset request (generates token, logs in dev or emails in prod)
+  // Password reset request
   app.post("/api/auth/forgot-password", async (request, reply) => {
     const { email } = request.body as { email: string };
     if (!email) {
@@ -156,32 +157,20 @@ export async function settingsRoutes(app: FastifyInstance) {
 
     // Always return success to prevent email enumeration
     if (!user) {
-      reply.send({ success: true, message: "If that email exists, a reset link has been sent." });
-      return;
+      return reply.send({ success: true, message: "If that email exists, a reset link has been sent." });
     }
 
-    // Generate a simple reset token (in production, use crypto.randomBytes)
     const { nanoid } = await import("nanoid");
     const token = nanoid(32);
-    const expiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
-    // Store token in user's metadata (simple approach — production would use a separate table)
-    await db
-      .update(users)
-      .set({
-        updatedAt: new Date(),
-        // Store reset token in costcoMemberId temporarily (hacky but avoids schema change)
-        // In production, add a proper password_reset_tokens table
-      })
-      .where(eq(users.id, user.id));
+    // Store token in Redis with 1-hour TTL
+    await redis.set(`reset:${token}`, user.id, "EX", 3600);
 
     const resetUrl = `${process.env.WEB_URL || "http://localhost:5173"}/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
 
     if (process.env.NODE_ENV !== "production" || !process.env.RESEND_API_KEY) {
-      // Dev mode: log the reset link
       console.log(`\n[PASSWORD RESET] Link for ${email}:\n  ${resetUrl}\n`);
     } else {
-      // Production: send email via Resend
       try {
         const { Resend } = await import("resend");
         const resend = new Resend(process.env.RESEND_API_KEY);
@@ -197,5 +186,51 @@ export async function settingsRoutes(app: FastifyInstance) {
     }
 
     reply.send({ success: true, message: "If that email exists, a reset link has been sent." });
+  });
+
+  // Consume reset token and set new password
+  app.post("/api/auth/reset-password", async (request, reply) => {
+    const { token, email, newPassword } = request.body as {
+      token: string;
+      email: string;
+      newPassword: string;
+    };
+
+    if (!token || !email || !newPassword) {
+      return reply.status(400).send({ success: false, error: "Missing required fields" });
+    }
+
+    if (newPassword.length < 8) {
+      return reply.status(400).send({ success: false, error: "Password must be at least 8 characters" });
+    }
+
+    // Verify token from Redis
+    const userId = await redis.get(`reset:${token}`);
+    if (!userId) {
+      return reply.status(400).send({ success: false, error: "Invalid or expired reset token" });
+    }
+
+    // Verify email matches the user
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    if (!user || user.email !== email.toLowerCase()) {
+      return reply.status(400).send({ success: false, error: "Invalid reset request" });
+    }
+
+    // Update password
+    const newHash = await hashPassword(newPassword);
+    await db
+      .update(users)
+      .set({ passwordHash: newHash, updatedAt: new Date() })
+      .where(eq(users.id, userId));
+
+    // Invalidate the token
+    await redis.del(`reset:${token}`);
+
+    reply.send({ success: true });
   });
 }

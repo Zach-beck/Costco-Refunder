@@ -15,17 +15,33 @@ interface ReceiptSummary {
 export function ReceiptsPage() {
   const [receipts, setReceipts] = useState<ReceiptSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
     async function load() {
-      const res = await api.listReceipts();
+      const res = await api.listReceipts(1);
       if (res.success && res.data) {
         setReceipts(res.data);
+        setHasMore(res.data.length >= 20);
       }
       setLoading(false);
     }
     load();
   }, []);
+
+  async function loadMore() {
+    setLoadingMore(true);
+    const nextPage = page + 1;
+    const res = await api.listReceipts(nextPage);
+    if (res.success && res.data) {
+      setReceipts((prev) => [...prev, ...res.data!]);
+      setPage(nextPage);
+      setHasMore(res.data.length >= 20);
+    }
+    setLoadingMore(false);
+  }
 
   if (loading) {
     return (
@@ -60,38 +76,50 @@ export function ReceiptsPage() {
           </Link>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
-          {receipts.map((receipt) => (
-            <Link
-              key={receipt.id}
-              to={`/receipts/${receipt.id}`}
-              className="block px-4 py-3 hover:bg-gray-50 transition-colors"
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="flex items-center gap-2 text-sm font-medium text-gray-900">
-                    <Calendar size={14} className="text-gray-400" />
-                    {receipt.receiptDate}
+        <>
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
+            {receipts.map((receipt) => (
+              <Link
+                key={receipt.id}
+                to={`/receipts/${receipt.id}`}
+                className="block px-4 py-3 hover:bg-gray-50 transition-colors"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center gap-2 text-sm font-medium text-gray-900">
+                      <Calendar size={14} className="text-gray-400" />
+                      {receipt.receiptDate}
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
+                      {receipt.warehouseId && (
+                        <>
+                          <MapPin size={12} />
+                          Warehouse #{receipt.warehouseId}
+                        </>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
-                    {receipt.warehouseId && (
-                      <>
-                        <MapPin size={12} />
-                        Warehouse #{receipt.warehouseId}
-                      </>
+                  <div className="text-right">
+                    {receipt.total && (
+                      <p className="text-sm font-medium">${receipt.total}</p>
                     )}
+                    <StatusBadge status={receipt.parseStatus} />
                   </div>
                 </div>
-                <div className="text-right">
-                  {receipt.total && (
-                    <p className="text-sm font-medium">${receipt.total}</p>
-                  )}
-                  <StatusBadge status={receipt.parseStatus} />
-                </div>
-              </div>
-            </Link>
-          ))}
-        </div>
+              </Link>
+            ))}
+          </div>
+
+          {hasMore && (
+            <button
+              onClick={loadMore}
+              disabled={loadingMore}
+              className="w-full py-3 text-sm text-brand-600 font-medium hover:bg-brand-50 rounded-lg border border-gray-200 disabled:opacity-50"
+            >
+              {loadingMore ? "Loading..." : "Load More"}
+            </button>
+          )}
+        </>
       )}
     </div>
   );

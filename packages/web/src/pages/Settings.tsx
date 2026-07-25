@@ -53,24 +53,18 @@ export function SettingsPage() {
     setError("");
     setSaved(false);
 
-    const res = await fetch("/api/settings/profile", {
-      method: "PATCH",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        costcoMemberId: memberId || null,
-        homeWarehouseId: warehouseId ? parseInt(warehouseId) : null,
-        notificationPrefs: { email: emailNotifs, push: pushNotifs },
-      }),
+    const res = await api.updateProfile({
+      costcoMemberId: memberId || null,
+      homeWarehouseId: warehouseId ? parseInt(warehouseId) : null,
+      notificationPrefs: { email: emailNotifs, push: pushNotifs },
     });
 
-    const json = await res.json();
-    if (json.success) {
+    if (res.success) {
       setSaved(true);
       await checkAuth();
       setTimeout(() => setSaved(false), 3000);
     } else {
-      setError(json.error || "Save failed");
+      setError(res.error || "Save failed");
     }
     setSaving(false);
   }
@@ -85,40 +79,34 @@ export function SettingsPage() {
       return;
     }
 
-    const res = await fetch("/api/settings/change-password", {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ currentPassword, newPassword }),
-    });
+    const res = await api.changePassword({ currentPassword, newPassword });
 
-    const json = await res.json();
-    if (json.success) {
+    if (res.success) {
       setPwSuccess(true);
       setCurrentPassword("");
       setNewPassword("");
     } else {
-      setPwError(json.error || "Failed to change password");
+      setPwError(res.error || "Failed to change password");
     }
   }
 
   async function handleEnablePush() {
     try {
+      const vapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
+      if (!vapidKey) {
+        console.error("VITE_VAPID_PUBLIC_KEY not configured");
+        return;
+      }
       const reg = await navigator.serviceWorker.ready;
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: import.meta.env.VITE_VAPID_PUBLIC_KEY,
+        applicationServerKey: vapidKey,
       });
 
       const json = sub.toJSON();
-      await fetch("/api/settings/push-subscription", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          endpoint: json.endpoint,
-          keys: json.keys,
-        }),
+      await api.savePushSubscription({
+        endpoint: json.endpoint!,
+        keys: json.keys as { p256dh: string; auth: string },
       });
 
       setPushEnabled(true);
@@ -132,12 +120,7 @@ export function SettingsPage() {
       const reg = await navigator.serviceWorker.ready;
       const sub = await reg.pushManager.getSubscription();
       if (sub) {
-        await fetch("/api/settings/push-subscription", {
-          method: "DELETE",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ endpoint: sub.endpoint }),
-        });
+        await api.deletePushSubscription(sub.endpoint);
         await sub.unsubscribe();
       }
       setPushEnabled(false);

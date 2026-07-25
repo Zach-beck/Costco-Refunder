@@ -41,23 +41,26 @@ export function ReceiptDetailPage() {
 
   useEffect(() => {
     if (!id) return;
-    loadReceipt();
-  }, [id]);
+    let cancelled = false;
 
-  async function loadReceipt() {
-    const res = await api.getReceipt(id!);
-    if (res.success && res.data) {
-      setReceipt(res.data);
-      // If still processing, poll
-      if (res.data.parseStatus === "pending" || res.data.parseStatus === "processing") {
-        setPolling(true);
-        setTimeout(loadReceipt, 2000);
-      } else {
-        setPolling(false);
+    async function loadReceipt() {
+      const res = await api.getReceipt(id!);
+      if (cancelled) return;
+      if (res.success && res.data) {
+        setReceipt(res.data);
+        if (res.data.parseStatus === "pending" || res.data.parseStatus === "processing") {
+          setPolling(true);
+          setTimeout(loadReceipt, 2000);
+        } else {
+          setPolling(false);
+        }
       }
+      setLoading(false);
     }
-    setLoading(false);
-  }
+
+    loadReceipt();
+    return () => { cancelled = true; };
+  }, [id]);
 
   async function handleConfirm() {
     if (!id) return;

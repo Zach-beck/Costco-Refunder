@@ -56,7 +56,7 @@ app.addHook("onRequest", async (request, reply) => {
     const attempts = await redis.incr(key);
     if (attempts === 1) await redis.expire(key, 60);
     if (attempts > 5) {
-      reply.status(429).send({
+      return reply.status(429).send({
         success: false,
         error: "Too many login attempts. Try again in a minute.",
       });

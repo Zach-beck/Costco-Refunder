@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { eq, and, desc, gte, sql } from "drizzle-orm";
+import { eq, and, desc, gte } from "drizzle-orm";
 import {
   priceObservations,
   priceAlerts,
@@ -8,8 +8,6 @@ import {
   items,
   warehouses,
   ManualPriceEntrySchema,
-  ADJUSTMENT_WINDOW_DAYS,
-  MIN_OBSERVATIONS_FOR_ALERT,
 } from "@costco-refunder/shared";
 import { db } from "../lib/db.js";
 import { requireAuth } from "../lib/auth.js";

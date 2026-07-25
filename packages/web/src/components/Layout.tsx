@@ -45,7 +45,7 @@ export function Layout() {
         </nav>
 
         {/* Page content */}
-        <main className="flex-1 p-4 md:p-6 overflow-auto">
+        <main className="flex-1 p-4 pb-20 md:p-6 md:pb-6 overflow-auto">
           <Outlet />
         </main>
       </div>
@@ -54,6 +54,7 @@ export function Layout() {
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around py-2">
         <MobileNavItem to="/" icon={<LayoutDashboard size={20} />} label="Home" />
         <MobileNavItem to="/upload" icon={<Upload size={20} />} label="Upload" />
+        <MobileNavItem to="/receipts" icon={<FileText size={20} />} label="Receipts" />
         <MobileNavItem to="/alerts" icon={<Bell size={20} />} label="Alerts" />
         <MobileNavItem to="/settings" icon={<Settings size={20} />} label="Settings" />
       </nav>

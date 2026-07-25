@@ -25,7 +25,13 @@ async function request<T>(
     ...options,
   });
 
-  const json = await res.json();
+  let json: any;
+  try {
+    json = await res.json();
+  } catch {
+    return { success: false, error: `Server error (${res.status})` };
+  }
+
   if (!res.ok) {
     return { success: false, error: json.error || "Request failed" };
   }
@@ -111,6 +117,19 @@ export const api = {
   // Warehouses
   getWarehouses: (search?: string) =>
     request<any[]>(`/warehouses${search ? `?search=${search}` : ""}`),
+
+  // Settings
+  updateProfile: (data: any) =>
+    request("/settings/profile", { method: "PATCH", body: JSON.stringify(data) }),
+
+  changePassword: (data: { currentPassword: string; newPassword: string }) =>
+    request("/settings/change-password", { method: "POST", body: JSON.stringify(data) }),
+
+  savePushSubscription: (data: { endpoint: string; keys: { p256dh: string; auth: string } }) =>
+    request("/settings/push-subscription", { method: "POST", body: JSON.stringify(data) }),
+
+  deletePushSubscription: (endpoint: string) =>
+    request("/settings/push-subscription", { method: "DELETE", body: JSON.stringify({ endpoint }) }),
 
   // Password reset
   forgotPassword: (email: string) =>

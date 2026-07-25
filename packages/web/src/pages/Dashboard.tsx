@@ -76,16 +76,15 @@ export function DashboardPage() {
       )}
 
       {/* Report price modal */}
-      {reportingItem && (
+      {reportingItem && reportingItem.itemNumber && reportingItem.warehouseId && (
         <ReportPriceModal
-          itemId={reportingItem.itemNumber!}
+          itemId={reportingItem.itemNumber}
           itemDescription={reportingItem.description ?? "Item"}
-          warehouseId={reportingItem.warehouseId!}
+          warehouseId={reportingItem.warehouseId}
           currentPrice={reportingItem.purchasePrice}
           onClose={() => setReportingItem(null)}
           onSubmit={() => {
             setReportingItem(null);
-            // Reload tracked items to reflect potential alert
             api.getTrackedItems().then((res) => {
               if (res.success && res.data) setTrackedItems(res.data);
             });
