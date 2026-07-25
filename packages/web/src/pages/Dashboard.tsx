@@ -15,8 +15,8 @@ export function DashboardPage() {
         api.getStats(),
         api.getTrackedItems(),
       ]);
-      if (statsRes.success) setStats(statsRes.data);
-      if (itemsRes.success) setTrackedItems(itemsRes.data);
+      if (statsRes.success && statsRes.data) setStats(statsRes.data);
+      if (itemsRes.success && itemsRes.data) setTrackedItems(itemsRes.data);
       setLoading(false);
     }
     load();

@@ -29,5 +29,8 @@ coverage/
 # Docker volumes
 docker-data/
 
+# Build info
+*.tsbuildinfo
+
 # Uploaded files (local dev)
 uploads/

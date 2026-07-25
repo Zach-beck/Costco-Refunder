@@ -17,7 +17,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@costco-refunder/shared": "workspace:*",
+    "@costco-refunder/shared": "*",
     "tesseract.js": "^5.1.0",
     "sharp": "^0.33.0"
   },

@@ -1,4 +1,4 @@
-import { Worker, QueueScheduler } from "bullmq";
+import { Worker } from "bullmq";
 import { eq, and, gte, desc, sql } from "drizzle-orm";
 import {
   receiptItems,
