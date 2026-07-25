@@ -163,6 +163,26 @@ export function UploadPage() {
         </div>
       )}
 
+      {/* Direct camera capture button (mobile-friendly) */}
+      {state === "idle" && (
+        <div className="md:hidden">
+          <label className="flex items-center justify-center gap-2 w-full bg-gray-800 text-white py-3 rounded-xl font-medium cursor-pointer hover:bg-gray-900 transition-colors">
+            <Camera size={20} />
+            Take Photo with Camera
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) onDrop([file]);
+              }}
+            />
+          </label>
+        </div>
+      )}
+
       {/* Tips */}
       <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
         <h4 className="text-sm font-medium text-blue-900 mb-2">Tips for best results</h4>

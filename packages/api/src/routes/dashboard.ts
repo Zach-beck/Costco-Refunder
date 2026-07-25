@@ -192,4 +192,77 @@ export async function dashboardRoutes(app: FastifyInstance) {
 
     reply.send({ success: true, data: filtered });
   });
+
+  // Savings history (for chart display)
+  app.get(
+    "/api/dashboard/savings-history",
+    { preHandler: [requireAuth] },
+    async (request, reply) => {
+      const userId = (request as any).userId;
+
+      const claimed = await db
+        .select({
+          savings: priceAlerts.savings,
+          claimedAt: priceAlerts.claimedAt,
+        })
+        .from(priceAlerts)
+        .where(
+          and(eq(priceAlerts.userId, userId), eq(priceAlerts.status, "claimed"))
+        )
+        .orderBy(priceAlerts.claimedAt);
+
+      // Group by month
+      const monthlyMap = new Map<string, number>();
+      for (const row of claimed) {
+        if (!row.claimedAt) continue;
+        const month = row.claimedAt.toISOString().slice(0, 7); // YYYY-MM
+        const current = monthlyMap.get(month) || 0;
+        monthlyMap.set(month, current + parseFloat(row.savings));
+      }
+
+      const history = Array.from(monthlyMap.entries()).map(([month, total]) => ({
+        month,
+        savings: total,
+      }));
+
+      reply.send({ success: true, data: history });
+    }
+  );
+
+  // Export data as CSV
+  app.get(
+    "/api/dashboard/export",
+    { preHandler: [requireAuth] },
+    async (request, reply) => {
+      const userId = (request as any).userId;
+
+      const allReceipts = await db
+        .select({
+          receiptDate: receipts.receiptDate,
+          warehouseId: receipts.warehouseId,
+          itemId: receiptItems.itemId,
+          description: receiptItems.descriptionRaw,
+          quantity: receiptItems.quantity,
+          unitPrice: receiptItems.unitPrice,
+          totalPrice: receiptItems.totalPrice,
+        })
+        .from(receiptItems)
+        .innerJoin(receipts, eq(receiptItems.receiptId, receipts.id))
+        .where(eq(receipts.userId, userId))
+        .orderBy(desc(receipts.receiptDate));
+
+      const header = "Date,Warehouse,Item#,Description,Qty,Unit Price,Total Price\n";
+      const rows = allReceipts
+        .map(
+          (r) =>
+            `${r.receiptDate},${r.warehouseId ?? ""},${r.itemId ?? ""},"${(r.description ?? "").replace(/"/g, '""')}",${r.quantity},${r.unitPrice},${r.totalPrice}`
+        )
+        .join("\n");
+
+      reply
+        .header("Content-Type", "text/csv")
+        .header("Content-Disposition", "attachment; filename=costco-purchases.csv")
+        .send(header + rows);
+    }
+  );
 }

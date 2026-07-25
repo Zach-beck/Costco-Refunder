@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    name: Typecheck, Test, Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "yarn"
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Build shared package
+        run: cd packages/shared && npx tsc
+
+      - name: Build parser package
+        run: cd packages/parser && npx tsc
+
+      - name: Typecheck API
+        run: cd packages/api && npx tsc --noEmit
+
+      - name: Typecheck Web
+        run: cd packages/web && npx tsc --noEmit
+
+      - name: Run tests
+        run: cd packages/parser && npx vitest run
+
+      - name: Build web (production)
+        run: cd packages/web && npx vite build

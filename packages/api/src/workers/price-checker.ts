@@ -1,5 +1,5 @@
 import { Worker } from "bullmq";
-import { eq, and, gte, desc, sql } from "drizzle-orm";
+import { eq, and, gte, lt, desc, sql, inArray } from "drizzle-orm";
 import {
   receiptItems,
   receipts,
@@ -135,7 +135,10 @@ export const priceCheckerWorker = new Worker<PriceCheckJob>(
       });
     }
 
-    return { checked: trackedItems.length, alertsCreated };
+    // Expire old alerts where the adjustment window has passed
+    const expiredCount = await expireOldAlerts();
+
+    return { checked: trackedItems.length, alertsCreated, expired: expiredCount };
   },
   {
     connection: redis,
@@ -143,9 +146,26 @@ export const priceCheckerWorker = new Worker<PriceCheckJob>(
   }
 );
 
+async function expireOldAlerts(): Promise<number> {
+  const today = new Date().toISOString().split("T")[0];
+
+  const result = await db
+    .update(priceAlerts)
+    .set({ status: "expired" })
+    .where(
+      and(
+        inArray(priceAlerts.status, ["pending", "notified"]),
+        lt(priceAlerts.eligibleUntil, today)
+      )
+    )
+    .returning({ id: priceAlerts.id });
+
+  return result.length;
+}
+
 priceCheckerWorker.on("completed", (job, result) => {
   console.log(
-    `Price check complete: ${result.checked} items checked, ${result.alertsCreated} alerts created`
+    `Price check complete: ${result.checked} items checked, ${result.alertsCreated} alerts created, ${result.expired} expired`
   );
 });
 

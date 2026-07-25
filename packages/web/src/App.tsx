@@ -1,9 +1,11 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useStore } from "./lib/store";
 import { Layout } from "./components/Layout";
+import { Onboarding } from "./components/Onboarding";
 import { LoginPage } from "./pages/Login";
 import { SignupPage } from "./pages/Signup";
+import { ForgotPasswordPage } from "./pages/ForgotPassword";
 import { DashboardPage } from "./pages/Dashboard";
 import { UploadPage } from "./pages/Upload";
 import { ReceiptsPage } from "./pages/Receipts";
@@ -27,31 +29,45 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 export function App() {
   const { checkAuth } = useStore();
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   useEffect(() => {
     checkAuth();
   }, [checkAuth]);
 
+  useEffect(() => {
+    const done = localStorage.getItem("onboarding-complete");
+    if (!done) {
+      setShowOnboarding(true);
+    }
+  }, []);
+
   return (
-    <Routes>
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/signup" element={<SignupPage />} />
-      <Route
-        path="/"
-        element={
-          <ProtectedRoute>
-            <Layout />
-          </ProtectedRoute>
-        }
-      >
-        <Route index element={<DashboardPage />} />
-        <Route path="upload" element={<UploadPage />} />
-        <Route path="receipts" element={<ReceiptsPage />} />
-        <Route path="receipts/:id" element={<ReceiptDetailPage />} />
-        <Route path="alerts" element={<AlertsPage />} />
-        <Route path="alerts/:id/guide" element={<GuidePage />} />
-        <Route path="settings" element={<SettingsPage />} />
-      </Route>
-    </Routes>
+    <>
+      {showOnboarding && (
+        <Onboarding onComplete={() => setShowOnboarding(false)} />
+      )}
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/signup" element={<SignupPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <Layout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<DashboardPage />} />
+          <Route path="upload" element={<UploadPage />} />
+          <Route path="receipts" element={<ReceiptsPage />} />
+          <Route path="receipts/:id" element={<ReceiptDetailPage />} />
+          <Route path="alerts" element={<AlertsPage />} />
+          <Route path="alerts/:id/guide" element={<GuidePage />} />
+          <Route path="settings" element={<SettingsPage />} />
+        </Route>
+      </Routes>
+    </>
   );
 }

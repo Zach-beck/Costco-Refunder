@@ -9,7 +9,7 @@ import {
   ADJUSTMENT_WINDOW_DAYS,
 } from "@costco-refunder/shared";
 import { db } from "../lib/db.js";
-import { getUploadUrl } from "../lib/s3.js";
+import { getUploadUrl, getDownloadUrl } from "../lib/s3.js";
 import { requireAuth } from "../lib/auth.js";
 import { receiptQueue } from "../workers/queues.js";
 
@@ -283,6 +283,73 @@ export async function receiptRoutes(app: FastifyInstance) {
         success: true,
         data: { trackedItemCount: trackedItems.length },
       });
+    }
+  );
+
+  // Get presigned URL to view the original receipt image
+  app.get(
+    "/api/receipts/:id/image",
+    { preHandler: [requireAuth] },
+    async (request, reply) => {
+      const userId = (request as any).userId;
+      const { id } = request.params as { id: string };
+
+      const [receipt] = await db
+        .select()
+        .from(receipts)
+        .where(and(eq(receipts.id, id), eq(receipts.userId, userId)))
+        .limit(1);
+
+      if (!receipt) {
+        return reply
+          .status(404)
+          .send({ success: false, error: "Receipt not found" });
+      }
+
+      const imageUrl = await getDownloadUrl(receipt.imageUrl);
+      reply.send({ success: true, data: { imageUrl } });
+    }
+  );
+
+  // Delete a receipt and all its items
+  app.delete(
+    "/api/receipts/:id",
+    { preHandler: [requireAuth] },
+    async (request, reply) => {
+      const userId = (request as any).userId;
+      const { id } = request.params as { id: string };
+
+      const [receipt] = await db
+        .select()
+        .from(receipts)
+        .where(and(eq(receipts.id, id), eq(receipts.userId, userId)))
+        .limit(1);
+
+      if (!receipt) {
+        return reply
+          .status(404)
+          .send({ success: false, error: "Receipt not found" });
+      }
+
+      // Cascade delete handles receipt_items via FK
+      await db.delete(receipts).where(eq(receipts.id, id));
+      reply.send({ success: true });
+    }
+  );
+
+  // Stop tracking a specific item
+  app.patch(
+    "/api/receipts/items/:itemId/stop-tracking",
+    { preHandler: [requireAuth] },
+    async (request, reply) => {
+      const { itemId } = request.params as { itemId: string };
+
+      await db
+        .update(receiptItems)
+        .set({ trackingActive: false })
+        .where(eq(receiptItems.id, itemId));
+
+      reply.send({ success: true });
     }
   );
 }

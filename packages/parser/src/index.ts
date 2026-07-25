@@ -13,6 +13,7 @@ export {
   analyzePriceEnding,
   checkItemEligibility,
 } from "./receipt-parser.js";
+export { parseEmailReceipt } from "./email-parser.js";
 
 /**
  * Full receipt parsing pipeline: preprocess → OCR → parse.

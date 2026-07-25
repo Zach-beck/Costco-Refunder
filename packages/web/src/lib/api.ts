@@ -1,15 +1,27 @@
 const API_BASE = "/api";
 
+function getCsrfToken(): string | null {
+  const match = document.cookie.match(/(?:^|;\s*)csrf-token=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
 async function request<T>(
   path: string,
   options?: RequestInit
 ): Promise<{ success: boolean; data?: T; error?: string }> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(options?.headers as Record<string, string>),
+  };
+
+  const csrfToken = getCsrfToken();
+  if (csrfToken && options?.method && options.method !== "GET") {
+    headers["x-csrf-token"] = csrfToken;
+  }
+
   const res = await fetch(`${API_BASE}${path}`, {
     credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...options?.headers,
-    },
+    headers,
     ...options,
   });
 
@@ -62,6 +74,15 @@ export const api = {
       body: JSON.stringify({ corrections }),
     }),
 
+  getReceiptImage: (id: string) =>
+    request<{ imageUrl: string }>(`/receipts/${id}/image`),
+
+  deleteReceipt: (id: string) =>
+    request(`/receipts/${id}`, { method: "DELETE" }),
+
+  stopTracking: (itemId: string) =>
+    request(`/receipts/items/${itemId}/stop-tracking`, { method: "PATCH" }),
+
   // Prices
   reportPrice: (data: { itemId: number; warehouseId: number; price: number; observedDate: string }) =>
     request("/prices/report", { method: "POST", body: JSON.stringify(data) }),
@@ -85,7 +106,16 @@ export const api = {
 
   getTrackedItems: () => request<any[]>("/dashboard/tracked-items"),
 
+  getSavingsHistory: () => request<any[]>("/dashboard/savings-history"),
+
   // Warehouses
   getWarehouses: (search?: string) =>
     request<any[]>(`/warehouses${search ? `?search=${search}` : ""}`),
+
+  // Password reset
+  forgotPassword: (email: string) =>
+    request("/auth/forgot-password", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    }),
 };

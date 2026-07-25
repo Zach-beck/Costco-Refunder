@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Check, AlertCircle, Loader2, Edit3 } from "lucide-react";
+import { Check, AlertCircle, Loader2, Trash2, Image } from "lucide-react";
 import { api } from "../lib/api";
 
 interface ReceiptItem {
@@ -35,6 +35,9 @@ export function ReceiptDetailPage() {
   const [loading, setLoading] = useState(true);
   const [confirming, setConfirming] = useState(false);
   const [polling, setPolling] = useState(false);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [showImage, setShowImage] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -64,6 +67,30 @@ export function ReceiptDetailPage() {
       navigate("/");
     }
     setConfirming(false);
+  }
+
+  async function handleViewImage() {
+    if (!id) return;
+    if (imageUrl) {
+      setShowImage(!showImage);
+      return;
+    }
+    const res = await api.getReceiptImage(id);
+    if (res.success && res.data) {
+      setImageUrl(res.data.imageUrl);
+      setShowImage(true);
+    }
+  }
+
+  async function handleDelete() {
+    if (!id) return;
+    if (!confirm("Delete this receipt and all its items? This cannot be undone.")) return;
+    setDeleting(true);
+    const res = await api.deleteReceipt(id);
+    if (res.success) {
+      navigate("/receipts");
+    }
+    setDeleting(false);
   }
 
   async function toggleTracking(itemId: string, active: boolean) {
@@ -99,8 +126,36 @@ export function ReceiptDetailPage() {
     <div className="max-w-2xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-gray-900">Receipt Details</h2>
-        <StatusBadge status={receipt.parseStatus} />
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleViewImage}
+            className="p-2 text-gray-500 hover:text-brand-600 rounded-lg hover:bg-gray-100"
+            title="View receipt image"
+          >
+            <Image size={18} />
+          </button>
+          <button
+            onClick={handleDelete}
+            disabled={deleting}
+            className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50"
+            title="Delete receipt"
+          >
+            <Trash2 size={18} />
+          </button>
+          <StatusBadge status={receipt.parseStatus} />
+        </div>
       </div>
+
+      {/* Receipt image */}
+      {showImage && imageUrl && (
+        <div className="rounded-xl overflow-hidden border border-gray-200">
+          <img
+            src={imageUrl}
+            alt="Original receipt"
+            className="w-full max-h-96 object-contain bg-gray-50"
+          />
+        </div>
+      )}
 
       {/* Parsing in progress */}
       {isParsing && (

@@ -1,15 +1,25 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useStore } from "../lib/store";
+import { api } from "../lib/api";
 
 export function SignupPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [warehouseId, setWarehouseId] = useState<number | undefined>();
+  const [whSearch, setWhSearch] = useState("");
+  const [warehouses, setWarehouses] = useState<any[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const { signup } = useStore();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    api.getWarehouses().then((res) => {
+      if (res.success && res.data) setWarehouses(res.data);
+    });
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,7 +35,7 @@ export function SignupPage() {
     }
 
     setLoading(true);
-    const err = await signup(email, password);
+    const err = await signup(email, password, warehouseId);
     if (err) {
       setError(err);
       setLoading(false);
@@ -33,6 +43,15 @@ export function SignupPage() {
       navigate("/");
     }
   };
+
+  const filteredWarehouses = whSearch
+    ? warehouses.filter(
+        (w) =>
+          w.name.toLowerCase().includes(whSearch.toLowerCase()) ||
+          w.city?.toLowerCase().includes(whSearch.toLowerCase()) ||
+          w.state?.toLowerCase().includes(whSearch.toLowerCase())
+      )
+    : warehouses;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
@@ -93,6 +112,33 @@ export function SignupPage() {
               onChange={(e) => setConfirmPassword(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Home Costco Warehouse <span className="text-gray-400">(optional)</span>
+            </label>
+            <input
+              type="text"
+              placeholder="Search by city, name, or state..."
+              value={whSearch}
+              onChange={(e) => setWhSearch(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none text-sm mb-1"
+            />
+            <select
+              value={warehouseId ?? ""}
+              onChange={(e) =>
+                setWarehouseId(e.target.value ? parseInt(e.target.value) : undefined)
+              }
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+            >
+              <option value="">Skip for now</option>
+              {filteredWarehouses.map((w) => (
+                <option key={w.id} value={w.id}>
+                  {w.name} — {w.city}, {w.state}
+                </option>
+              ))}
+            </select>
           </div>
 
           <button
