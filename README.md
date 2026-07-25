@@ -78,13 +78,19 @@ costco-price-tracker/
 - Yarn 1.x
 - Docker (for local databases)
 
-### Setup
+### Quick Setup (One Command)
 
 ```bash
-# Clone the repo
 git clone https://github.com/Zach-beck/Costco-Refunder.git
 cd Costco-Refunder
+./scripts/setup.sh
+```
 
+This installs dependencies, starts PostgreSQL/Redis/MinIO via Docker, runs migrations, and seeds warehouse data.
+
+### Manual Setup
+
+```bash
 # Install dependencies
 yarn install
 
@@ -102,6 +108,17 @@ yarn db:seed
 
 # Start development servers (API + Web)
 yarn dev
+```
+
+### Using the Makefile
+
+```bash
+make setup     # Full one-command setup
+make dev       # Start infra + app
+make stop      # Stop Docker containers
+make test      # Run all tests
+make typecheck # TypeScript checking
+make db-reset  # Drop and recreate database
 ```
 
 The web app runs at `http://localhost:5173` and the API at `http://localhost:3001`.
