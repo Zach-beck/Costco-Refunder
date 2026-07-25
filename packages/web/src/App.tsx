@@ -6,6 +6,7 @@ import { LoginPage } from "./pages/Login";
 import { SignupPage } from "./pages/Signup";
 import { DashboardPage } from "./pages/Dashboard";
 import { UploadPage } from "./pages/Upload";
+import { ReceiptsPage } from "./pages/Receipts";
 import { ReceiptDetailPage } from "./pages/ReceiptDetail";
 import { AlertsPage } from "./pages/Alerts";
 import { GuidePage } from "./pages/Guide";
@@ -45,6 +46,7 @@ export function App() {
       >
         <Route index element={<DashboardPage />} />
         <Route path="upload" element={<UploadPage />} />
+        <Route path="receipts" element={<ReceiptsPage />} />
         <Route path="receipts/:id" element={<ReceiptDetailPage />} />
         <Route path="alerts" element={<AlertsPage />} />
         <Route path="alerts/:id/guide" element={<GuidePage />} />

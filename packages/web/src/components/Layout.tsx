@@ -1,5 +1,5 @@
 import { Outlet, NavLink, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Upload, Bell, Settings, LogOut } from "lucide-react";
+import { LayoutDashboard, Upload, Bell, Settings, LogOut, FileText } from "lucide-react";
 import { useStore } from "../lib/store";
 
 export function Layout() {
@@ -39,6 +39,7 @@ export function Layout() {
         <nav className="hidden md:flex flex-col w-56 bg-white border-r border-gray-200 p-4 gap-1">
           <NavItem to="/" icon={<LayoutDashboard size={18} />} label="Dashboard" />
           <NavItem to="/upload" icon={<Upload size={18} />} label="Upload Receipt" />
+          <NavItem to="/receipts" icon={<FileText size={18} />} label="Receipts" />
           <NavItem to="/alerts" icon={<Bell size={18} />} label="Price Alerts" />
           <NavItem to="/settings" icon={<Settings size={18} />} label="Settings" />
         </nav>

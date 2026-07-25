@@ -1,13 +1,15 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { TrendingDown, Package, Bell, DollarSign, Upload } from "lucide-react";
+import { TrendingDown, Package, Bell, DollarSign, Upload, Tag } from "lucide-react";
 import { api } from "../lib/api";
+import { ReportPriceModal } from "../components/ReportPriceModal";
 import type { DashboardStats, TrackedItem } from "@costco-refunder/shared";
 
 export function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [trackedItems, setTrackedItems] = useState<TrackedItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [reportingItem, setReportingItem] = useState<TrackedItem | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -73,6 +75,24 @@ export function DashboardPage() {
         </div>
       )}
 
+      {/* Report price modal */}
+      {reportingItem && (
+        <ReportPriceModal
+          itemId={reportingItem.itemNumber!}
+          itemDescription={reportingItem.description ?? "Item"}
+          warehouseId={reportingItem.warehouseId!}
+          currentPrice={reportingItem.purchasePrice}
+          onClose={() => setReportingItem(null)}
+          onSubmit={() => {
+            setReportingItem(null);
+            // Reload tracked items to reflect potential alert
+            api.getTrackedItems().then((res) => {
+              if (res.success && res.data) setTrackedItems(res.data);
+            });
+          }}
+        />
+      )}
+
       {/* Tracked items */}
       <div>
         <h3 className="text-lg font-semibold text-gray-900 mb-3">
@@ -103,13 +123,23 @@ export function DashboardPage() {
                       {item.daysRemaining}d remaining
                     </p>
                   </div>
-                  <div className="text-right ml-4">
-                    <p className="text-sm font-medium">${item.purchasePrice.toFixed(2)}</p>
-                    {item.priceDrop && (
-                      <p className="text-xs text-green-600 font-medium">
-                        -${item.priceDrop.toFixed(2)} drop!
-                      </p>
-                    )}
+                  <div className="flex items-center gap-2 ml-4">
+                    <button
+                      onClick={() => setReportingItem(item)}
+                      className="text-xs text-brand-600 hover:text-brand-700 flex items-center gap-1 px-2 py-1 rounded hover:bg-brand-50"
+                      title="Report a lower price"
+                    >
+                      <Tag size={12} />
+                      Report
+                    </button>
+                    <div className="text-right">
+                      <p className="text-sm font-medium">${item.purchasePrice.toFixed(2)}</p>
+                      {item.priceDrop && (
+                        <p className="text-xs text-green-600 font-medium">
+                          -${item.priceDrop.toFixed(2)} drop!
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}

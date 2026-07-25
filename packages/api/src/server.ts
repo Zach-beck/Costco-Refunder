@@ -38,6 +38,18 @@ await app.register(rateLimit, {
   timeWindow: "1 minute",
 });
 
+// Global error handler
+app.setErrorHandler((error: any, request, reply) => {
+  const statusCode = error.statusCode ?? 500;
+  if (statusCode >= 500) {
+    app.log.error(error);
+  }
+  reply.status(statusCode).send({
+    success: false,
+    error: statusCode >= 500 ? "Internal server error" : error.message,
+  });
+});
+
 // Routes
 await app.register(authRoutes);
 await app.register(receiptRoutes);
