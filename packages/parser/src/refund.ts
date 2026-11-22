@@ -1,5 +1,5 @@
-import type { ParsedReceipt, ParsedReceiptItem, PurchaseChannel } from "@costco-refunder/shared";
-import { ADJUSTMENT_WINDOW_DAYS, POLICY_SOURCE } from "@costco-refunder/shared/types";
+import type { ParsedReceipt, ParsedReceiptItem, PurchaseChannel } from "@receipt-rewind/shared";
+import { ADJUSTMENT_WINDOW_DAYS, POLICY_SOURCE } from "@receipt-rewind/shared/types";
 import { addDaysIso, daysBetweenIso } from "./dates.js";
 import { parseEmailReceipt } from "./email-parser.js";
 import type { CatalogPrice } from "./prices.js";

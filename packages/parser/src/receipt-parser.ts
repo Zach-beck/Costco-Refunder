@@ -1,4 +1,4 @@
-import type { ParsedReceipt, ParsedReceiptItem } from "@costco-refunder/shared";
+import type { ParsedReceipt, ParsedReceiptItem } from "@receipt-rewind/shared";
 import type { OcrLine } from "./ocr.js";
 
 // ─── Regex patterns for Costco receipt format ────────────────────────────────
@@ -267,8 +267,8 @@ function calculateOverallConfidence(
 // a clearance markdown, and reports about .00 and .88 conflict. These are
 // unofficial hints only. They never remove a line from the check.
 
-import type { PriceEndingAnalysis } from "@costco-refunder/shared";
-import { ADJUSTMENT_WINDOW_DAYS } from "@costco-refunder/shared/types";
+import type { PriceEndingAnalysis } from "@receipt-rewind/shared";
+import { ADJUSTMENT_WINDOW_DAYS } from "@receipt-rewind/shared/types";
 
 export function analyzePriceEnding(price: number): PriceEndingAnalysis {
   const cents = Math.round((price % 1) * 100);

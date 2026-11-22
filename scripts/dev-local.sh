@@ -21,17 +21,17 @@ export HOST="${HOST:-127.0.0.1}"
 export NODE_ENV="${NODE_ENV:-development}"
 
 echo "Building shared packages..."
-yarn workspace @costco-refunder/shared build
-yarn workspace @costco-refunder/parser build
+yarn workspace @receipt-rewind/shared build
+yarn workspace @receipt-rewind/parser build
 
 echo ""
 echo "Starting local API on ${API_URL} and web on ${WEB_URL}"
 echo "Data stays in ${DATA_DIR}. No Docker and no Costco login."
 echo ""
 
-yarn workspace @costco-refunder/api dev &
+yarn workspace @receipt-rewind/api dev &
 API_PID=$!
-yarn workspace @costco-refunder/web dev &
+yarn workspace @receipt-rewind/web dev &
 WEB_PID=$!
 
 cleanup() {

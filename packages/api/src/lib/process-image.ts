@@ -6,7 +6,7 @@ export async function processReceiptImageJob(
   imageKey: string,
   userId: string
 ) {
-  const { parseReceiptImage } = await import("@costco-refunder/parser");
+  const { parseReceiptImage } = await import("@receipt-rewind/parser");
   const imageBuffer = await getObject(imageKey);
   const parsed = await parseReceiptImage(imageBuffer);
   return persistParsedReceipt({

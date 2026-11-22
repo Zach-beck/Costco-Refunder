@@ -7,7 +7,7 @@ import {
   priceObservations,
   items,
   warehouses,
-} from "@costco-refunder/shared";
+} from "@receipt-rewind/shared";
 import { db } from "../lib/db.js";
 import { requireAuth } from "../lib/auth.js";
 

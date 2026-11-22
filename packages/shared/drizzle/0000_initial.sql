@@ -1,4 +1,4 @@
--- Costco Refunder: Initial schema migration
+-- Receipt Rewind: Initial schema migration
 -- Generated from packages/shared/src/schema.ts
 
 CREATE TABLE IF NOT EXISTS "warehouses" (

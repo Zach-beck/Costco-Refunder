@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { TrendingDown, Package, Bell, DollarSign, Upload, Tag } from "lucide-react";
 import { api } from "../lib/api";
 import { ReportPriceModal } from "../components/ReportPriceModal";
-import type { DashboardStats, TrackedItem } from "@costco-refunder/shared";
+import type { DashboardStats, TrackedItem } from "@receipt-rewind/shared";
 
 export function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);

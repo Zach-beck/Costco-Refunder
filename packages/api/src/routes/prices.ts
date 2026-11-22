@@ -8,10 +8,10 @@ import {
   items,
   warehouses,
   ManualPriceEntrySchema,
-} from "@costco-refunder/shared";
+} from "@receipt-rewind/shared";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { parsePriceCatalogCsv, parsePublicPriceHtml } from "@costco-refunder/parser/text";
+import { parsePriceCatalogCsv, parsePublicPriceHtml } from "@receipt-rewind/parser/text";
 import { db } from "../lib/db.js";
 import { requireAuth } from "../lib/auth.js";
 import { checkForAlerts, ensureWarehouse } from "../lib/alerts.js";

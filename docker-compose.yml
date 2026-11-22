@@ -6,7 +6,7 @@ services:
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_DB: costco_refunder
+      POSTGRES_DB: receipt_rewind
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     volumes:

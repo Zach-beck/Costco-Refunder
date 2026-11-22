@@ -7,7 +7,7 @@ import {
   priceAlerts,
   PRICE_FRESHNESS_DAYS,
   MIN_OBSERVATIONS_FOR_ALERT,
-} from "@costco-refunder/shared";
+} from "@receipt-rewind/shared";
 import { redis } from "../lib/redis.js";
 import { db } from "../lib/db.js";
 import { notificationQueue } from "./queues.js";

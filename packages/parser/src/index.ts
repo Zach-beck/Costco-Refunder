@@ -1,4 +1,4 @@
-import type { ParsedReceipt } from "@costco-refunder/shared";
+import type { ParsedReceipt } from "@receipt-rewind/shared";
 import { autoCropReceipt, preprocessReceiptImage } from "./preprocess.js";
 import { performOcr, terminateOcr } from "./ocr.js";
 import { parseReceiptLines } from "./receipt-parser.js";

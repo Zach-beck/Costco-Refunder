@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useStore } from "../lib/store";
 import { api } from "../lib/api";
 import { Save, Download, Bell, BellOff } from "lucide-react";
-import { POLICY_SOURCE } from "@costco-refunder/shared/types";
+import { POLICY_SOURCE } from "@receipt-rewind/shared/types";
 
 export function SettingsPage() {
   const { user, checkAuth } = useStore();

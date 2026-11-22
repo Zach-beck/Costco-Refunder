@@ -2,8 +2,8 @@ import "./load-env.js";
 import { mkdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import * as schema from "@costco-refunder/shared";
-import { SAMPLE_WAREHOUSES } from "@costco-refunder/shared";
+import * as schema from "@receipt-rewind/shared";
+import { SAMPLE_WAREHOUSES } from "@receipt-rewind/shared";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import { isLocalMode } from "./mode.js";
 

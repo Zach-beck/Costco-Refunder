@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Bell, DollarSign, Clock, CheckCircle2, X } from "lucide-react";
 import { api } from "../lib/api";
-import type { PriceAlert } from "@costco-refunder/shared";
+import type { PriceAlert } from "@receipt-rewind/shared";
 
 export function AlertsPage() {
   const [alerts, setAlerts] = useState<PriceAlert[]>([]);
