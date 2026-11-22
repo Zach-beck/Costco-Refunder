@@ -42,7 +42,11 @@ export interface ParsedReceipt {
   total: number | null;
   overallConfidence: number;
   rawText: string;
+  /** Where the purchase happened. Online and warehouse prices never cross-match. */
+  channel?: PurchaseChannel;
 }
+
+export type PurchaseChannel = "warehouse" | "online";
 
 export type ParseStatus = "pending" | "processing" | "complete" | "failed";
 
@@ -132,12 +136,11 @@ export interface ReimbursementGuide {
   steps: ReimbursementStep[];
 }
 
-// ─── Costco Price Ending Rules ───────────────────────────────────────────────
+// ─── Price Ending Hints (unofficial) ───────────────────────────────────────────────
 
 export type PriceEndingType =
   | "regular"
   | "clearance"
-  | "manufacturer_special"
   | "unknown";
 
 export interface PriceEndingAnalysis {
@@ -174,7 +177,19 @@ export type NotificationPrefs = z.infer<typeof NotificationPrefsSchema>;
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
+/**
+ * Costco's US "Price Match - Costco.com Orders" page documents 30 days for
+ * Costco.com orders. Only Costco Canada's page states 30 days for warehouse
+ * purchases, so the warehouse deadline is an assumption.
+ */
 export const ADJUSTMENT_WINDOW_DAYS = 30;
+
+export const POLICY_SOURCE = {
+  page: "Price Match - Costco.com Orders (customerservice.costco.com, answer 628)",
+  version: "30.0",
+  published: "2026-11-20",
+  lastChecked: "2026-11-21",
+} as const;
 export const PRICE_FRESHNESS_DAYS = 7;
 export const MIN_OBSERVATIONS_FOR_ALERT = 2;
 export const MIN_CONFIDENCE_THRESHOLD = 0.8;

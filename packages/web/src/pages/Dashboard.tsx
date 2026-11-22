@@ -68,11 +68,14 @@ export function DashboardPage() {
           />
           <StatCard
             icon={<TrendingDown size={20} />}
-            label="Available Savings"
+            label="Possible Price Matches"
             value={`$${stats.totalSavingsAvailable.toFixed(2)}`}
             color="purple"
           />
         </div>
+      )}
+      {stats && (
+        <p className="text-xs text-gray-500">Costco decides every claim.</p>
       )}
 
       {/* Report price modal */}

@@ -12,10 +12,18 @@ export {
   parseReceiptLines,
   analyzePriceEnding,
   checkItemEligibility,
+  isFuelReceipt,
 } from "./receipt-parser.js";
 export { parseEmailReceipt } from "./email-parser.js";
 export { parsePriceCatalogCsv, parsePublicPriceHtml } from "./prices.js";
-export { evaluateRefunds, formatRefundReport, parseReceiptText } from "./refund.js";
+export {
+  evaluateRefunds,
+  formatRefundReport,
+  parseReceiptText,
+  claimInstructions,
+  detectChannel,
+  PRODUCT_NAME,
+} from "./refund.js";
 export { redactReceiptText } from "./redact.js";
 export { addDaysIso } from "./dates.js";
 

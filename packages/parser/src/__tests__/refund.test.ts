@@ -5,7 +5,12 @@ import { describe, expect, it } from "vitest";
 import { parseEmailReceipt } from "../email-parser.js";
 import { parsePriceCatalogCsv, parsePublicPriceHtml } from "../prices.js";
 import { redactReceiptText } from "../redact.js";
-import { evaluateRefunds } from "../refund.js";
+import {
+  claimInstructions,
+  detectChannel,
+  evaluateRefunds,
+  formatRefundReport,
+} from "../refund.js";
 
 const fixtures = join(dirname(fileURLToPath(import.meta.url)), "../../../../fixtures");
 
@@ -37,7 +42,7 @@ describe("price catalogs", () => {
 describe("evaluateRefunds", () => {
   const prices = parsePriceCatalogCsv(fixture("public-prices.csv"));
 
-  it("computes claimable refunds from the sample receipt", () => {
+  it("computes possible price matches from the sample receipt", () => {
     const evaluation = evaluateRefunds({
       receiptText: fixture("sample-receipt.txt"),
       prices,
@@ -47,7 +52,11 @@ describe("evaluateRefunds", () => {
     expect(evaluation.receipt.warehouseId).toBe(116);
     expect(evaluation.receipt.receiptDate).toBe("2026-11-01");
     expect(evaluation.receipt.items).toHaveLength(6);
-    expect(evaluation.totalRefund).toBe(7);
+    expect(evaluation.channel).toBe("warehouse");
+    // Olive oil 3.50 + paper towels 3.50, plus two lines with unofficial caveats:
+    // vitamins (.97 ending) 5.00 and fuel 0.40.
+    expect(evaluation.totalRefund).toBe(12.4);
+    expect(evaluation.caveatTotal).toBe(5.4);
 
     const olive = evaluation.results.find((line) => line.itemNumber === 1111111);
     expect(olive).toMatchObject({
@@ -56,7 +65,10 @@ describe("evaluateRefunds", () => {
       totalSavings: 3.5,
       daysRemaining: 16,
       deadline: "2026-12-01",
+      hints: [],
     });
+    // The $1.00 row is from another warehouse and doesn't count.
+    expect(olive?.ignoredPrices[0]).toContain("warehouse #1");
 
     const towels = evaluation.results.find((line) => line.itemNumber === 6666666);
     expect(towels?.totalSavings).toBe(3.5);
@@ -64,12 +76,25 @@ describe("evaluateRefunds", () => {
     const chicken = evaluation.results.find((line) => line.itemNumber === 2222222);
     expect(chicken).toMatchObject({ eligible: true, totalSavings: 0 });
 
-    expect(evaluation.results.find((line) => line.itemNumber === 3333333)?.eligible).toBe(false);
-    expect(evaluation.results.find((line) => line.itemNumber === 4444444)?.eligible).toBe(false);
-    expect(evaluation.results.find((line) => line.itemNumber === 5555555)?.eligible).toBe(false);
+    const vitamins = evaluation.results.find((line) => line.itemNumber === 4444444);
+    expect(vitamins).toMatchObject({ eligible: true, totalSavings: 5 });
+    expect(vitamins?.hints[0]).toContain(".97");
+
+    const gift = evaluation.results.find((line) => line.itemNumber === 5555555);
+    expect(gift?.hints.join(" ")).toContain("gift cards");
   });
 
-  it("uses a saved HTML price page the same way", () => {
+  it("points warehouse claims to the Returns counter, not a phone number", () => {
+    const report = formatRefundReport(
+      evaluateRefunds({ receiptText: fixture("sample-receipt.txt"), prices, asOf: "2026-11-15" })
+    );
+    expect(report).toContain("Receipt Rewind");
+    expect(report).toContain("Returns counter at warehouse #116");
+    expect(report).toContain("Costco decides every claim");
+    expect(report).not.toContain("774-2678");
+  });
+
+  it("never matches a saved costco.com page against a warehouse receipt", () => {
     const evaluation = evaluateRefunds({
       receiptText: fixture("sample-receipt.txt"),
       prices: parsePublicPriceHtml(fixture("public-price-page.html"), {
@@ -78,7 +103,67 @@ describe("evaluateRefunds", () => {
       }),
       asOf: "2026-11-15",
     });
-    expect(evaluation.totalRefund).toBe(7);
+    expect(evaluation.totalRefund).toBe(0);
+    const olive = evaluation.results.find((line) => line.itemNumber === 1111111);
+    expect(olive?.ignoredPrices[0]).toContain("online price");
+  });
+
+  it("does not let a price with a blank warehouse match any warehouse", () => {
+    const evaluation = evaluateRefunds({
+      receiptText: fixture("sample-receipt.txt"),
+      prices: parsePriceCatalogCsv(
+        "item_number,description,price,warehouse_id,observed_date\n1111111,KS OLIVE OIL,9.99,,2026-11-10"
+      ),
+      asOf: "2026-11-15",
+    });
+    expect(evaluation.totalRefund).toBe(0);
+    const olive = evaluation.results.find((line) => line.itemNumber === 1111111);
+    expect(olive?.ignoredPrices[0]).toContain("no warehouse number");
+  });
+
+  it("skips per-pound prices", () => {
+    const evaluation = evaluateRefunds({
+      receiptText: fixture("sample-receipt.txt"),
+      prices: parsePriceCatalogCsv(
+        "item_number,description,price,warehouse_id,observed_date,channel,unit\n2222222,ROTISSERIE CHICKEN,1.99,116,2026-11-10,warehouse,lb"
+      ),
+      asOf: "2026-11-15",
+    });
+    const chicken = evaluation.results.find((line) => line.itemNumber === 2222222);
+    expect(chicken?.totalSavings).toBe(0);
+    expect(chicken?.ignoredPrices[0]).toContain("per-pound");
+  });
+
+  it("uses the promotion end date as the deadline and respects promo limits", () => {
+    const evaluation = evaluateRefunds({
+      receiptText: fixture("sample-receipt.txt"),
+      prices: parsePriceCatalogCsv(
+        "item_number,description,price,warehouse_id,observed_date,channel,promo_end,promo_limit\n1111111,KS OLIVE OIL,11.49,116,2026-11-10,warehouse,2026-11-20,1"
+      ),
+      asOf: "2026-11-15",
+    });
+    const olive = evaluation.results.find((line) => line.itemNumber === 1111111);
+    expect(olive).toMatchObject({ deadline: "2026-11-20", daysRemaining: 5, totalSavings: 3.5 });
+
+    const after = evaluateRefunds({
+      receiptText: fixture("sample-receipt.txt"),
+      prices: parsePriceCatalogCsv(
+        "item_number,description,price,warehouse_id,observed_date,channel,promo_end\n1111111,KS OLIVE OIL,11.49,116,2026-11-10,warehouse,2026-11-12"
+      ),
+      asOf: "2026-11-15",
+    });
+    expect(after.totalRefund).toBe(0);
+  });
+
+  it("skips fuel receipts instead of treating them as a failed parse", () => {
+    const evaluation = evaluateRefunds({
+      receiptText:
+        "Gas Station Receipt | 11/02/2026 09:00 | Sampletown #123\nPump 4, Gallons 10.000, $4.999/gal, Regular $49.99; Total Sale $49.99",
+      prices,
+      asOf: "2026-11-15",
+    });
+    expect(evaluation.isFuel).toBe(true);
+    expect(formatRefundReport(evaluation)).toContain("Fuel receipt: skipped");
   });
 
   it("parses a digital receipt email without taking the subtotal as the total", () => {
@@ -94,6 +179,11 @@ describe("evaluateRefunds", () => {
       asOf: "2026-11-15",
     });
     expect(evaluation.totalRefund).toBe(7);
+  });
+
+  it("sends Costco.com orders to the online form", () => {
+    expect(claimInstructions("online", null)).toContain("Request a Price Match form");
+    expect(detectChannel("Costco.com Order Number 123")).toBe("online");
   });
 });
 

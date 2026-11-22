@@ -35,3 +35,9 @@ docker-data/
 # Uploaded files and embedded local database
 uploads/
 data/
+
+# Real receipts, price files and outputs. Never commit.
+data/private/
+private/
+*.private.*
+receipts-real/

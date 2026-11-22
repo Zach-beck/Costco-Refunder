@@ -14,21 +14,21 @@ const STEPS = [
   },
   {
     icon: <Clock className="text-amber-600" size={32} />,
-    title: "30-day tracking window",
+    title: "30-day window",
     description:
-      "Costco allows price adjustments within 30 days of purchase. We track each item until the window closes.",
+      "Costco's US price match page lists 30 days for Costco.com orders. This app assumes 30 days for warehouse purchases too and tracks each item until then. Costco decides every request.",
   },
   {
     icon: <Bell className="text-purple-600" size={32} />,
     title: "Get notified of price drops",
     description:
-      "Import a price file you saved, or type a price you saw. If it is lower, you get an alert with the refund.",
+      "Import a price file you saved, or type a price you saw. If it is lower at the same warehouse, you get an alert with the difference.",
   },
   {
     icon: <DollarSign className="text-green-600" size={32} />,
-    title: "Claim your refund",
+    title: "Ask for the price match",
     description:
-      "Follow our step-by-step guide to get your money back at the membership counter or by phone.",
+      "Follow the step-by-step guide: the Returns counter at the warehouse where you bought it, or Costco's online form for Costco.com orders.",
   },
 ];
 

@@ -1,14 +1,32 @@
+/**
+ * Where a price was seen.
+ * - "warehouse": on the shelf (or a warehouse deal list) at the warehouse in `warehouseId`
+ * - "online": costco.com or another online Costco channel. Never matched against warehouse receipts.
+ */
+export type PriceChannel = "warehouse" | "online";
+
+/** "each" is a per-item price. "lb" is a per-pound price and can't be compared to a receipt total. */
+export type PriceUnit = "each" | "lb";
+
 export interface CatalogPrice {
   itemNumber: number;
   description: string;
   price: number;
+  /** Required for warehouse prices. A blank warehouse never matches a warehouse receipt. */
   warehouseId: number | null;
   observedDate: string | null;
+  channel: PriceChannel;
+  unit: PriceUnit;
+  /** Last day of a dated promotion. A promo drop must be claimed before it ends. */
+  promoEnd: string | null;
+  /** Promotional item limit. Only this many units count. */
+  promoLimit: number | null;
 }
 
 export interface PriceParseDefaults {
   warehouseId?: number | null;
   observedDate?: string | null;
+  channel?: PriceChannel;
 }
 
 export function parsePriceCatalogCsv(
@@ -35,6 +53,11 @@ export function parsePriceCatalogCsv(
     const priceRaw = pick(cells, index, "price", index ? 2 : cells.length > 2 ? 2 : 1);
     const warehouseRaw = pick(cells, index, "warehouse", 3);
     const dateRaw = pick(cells, index, "date", 4);
+    const channelRaw = index && index.channel !== undefined ? cells[index.channel] ?? "" : "";
+    const unitRaw = index && index.unit !== undefined ? cells[index.unit] ?? "" : "";
+    const promoEndRaw = index && index.promoEnd !== undefined ? cells[index.promoEnd] ?? "" : "";
+    const promoLimitRaw =
+      index && index.promoLimit !== undefined ? cells[index.promoLimit] ?? "" : "";
 
     const itemNumber = parseInt(itemRaw.replace(/\D/g, ""), 10);
     const price = parsePriceToken(priceRaw);
@@ -49,6 +72,11 @@ export function parsePriceCatalogCsv(
       price,
       warehouseId,
       observedDate,
+      // A CSV you type is what you saw in the warehouse unless it says otherwise.
+      channel: parseChannel(channelRaw) ?? defaults.channel ?? "warehouse",
+      unit: parseUnit(unitRaw || channelRaw),
+      promoEnd: normalizeDate(promoEndRaw),
+      promoLimit: parseOptionalInt(promoLimitRaw),
     });
   }
 
@@ -80,6 +108,11 @@ function parseArticlePrices(html: string, defaults: PriceParseDefaults): Catalog
       price,
       warehouseId: defaults.warehouseId ?? null,
       observedDate: defaults.observedDate ?? null,
+      // A saved product page is a costco.com page: an online price.
+      channel: defaults.channel ?? "online",
+      unit: "each",
+      promoEnd: null,
+      promoLimit: null,
     });
   }
   return prices;
@@ -112,6 +145,11 @@ function parseTablePrices(html: string, defaults: PriceParseDefaults): CatalogPr
       price,
       warehouseId: defaults.warehouseId ?? null,
       observedDate: defaults.observedDate ?? null,
+      // A saved product page is a costco.com page: an online price.
+      channel: defaults.channel ?? "online",
+      unit: "each",
+      promoEnd: null,
+      promoLimit: null,
     });
   }
   return prices;
@@ -124,7 +162,11 @@ function headerIndex(cells: string[]): Record<string, number> {
     else if (cell.includes("desc") || cell.includes("name")) index.description = position;
     else if (cell.includes("price")) index.price = position;
     else if (cell.includes("warehouse") || cell === "wh") index.warehouse = position;
+    else if (cell === "promo_end" || cell === "promo end") index.promoEnd = position;
+    else if (cell === "promo_limit" || cell === "promo limit") index.promoLimit = position;
     else if (cell.includes("date")) index.date = position;
+    else if (cell === "channel") index.channel = position;
+    else if (cell === "unit") index.unit = position;
   });
   return index;
 }
@@ -205,4 +247,17 @@ function stripTags(value: string): string {
     .replace(/&amp;/g, "&")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function parseChannel(raw: string): PriceChannel | null {
+  const value = raw.trim().toLowerCase();
+  if (!value) return null;
+  if (value === "online" || value.includes("costco.com") || value === "same-day") return "online";
+  if (value.startsWith("wh") || value === "warehouse" || value === "in-warehouse") return "warehouse";
+  return null;
+}
+
+function parseUnit(raw: string): PriceUnit {
+  const value = raw.trim().toLowerCase();
+  return value === "lb" || value === "per-lb" || value === "per lb" ? "lb" : "each";
 }

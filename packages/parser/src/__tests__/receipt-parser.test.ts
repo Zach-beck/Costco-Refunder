@@ -95,22 +95,16 @@ describe("parseReceiptLines", () => {
 });
 
 describe("analyzePriceEnding", () => {
-  it("identifies clearance pricing (.97)", () => {
+  it("flags .97 as an unofficial clearance hint without dropping the line", () => {
     const result = analyzePriceEnding(24.97);
     expect(result.type).toBe("clearance");
-    expect(result.isEligibleForAdjustment).toBe(false);
+    expect(result.isEligibleForAdjustment).toBe(true);
+    expect(result.note).toContain("Unofficial");
   });
 
-  it("identifies manufacturer special (.00)", () => {
-    const result = analyzePriceEnding(10.0);
-    expect(result.type).toBe("manufacturer_special");
-    expect(result.isEligibleForAdjustment).toBe(true);
-  });
-
-  it("identifies manufacturer special (.88)", () => {
-    const result = analyzePriceEnding(15.88);
-    expect(result.type).toBe("manufacturer_special");
-    expect(result.isEligibleForAdjustment).toBe(true);
+  it("does not claim a meaning for .00 or .88", () => {
+    expect(analyzePriceEnding(10.0).type).toBe("regular");
+    expect(analyzePriceEnding(15.88).type).toBe("regular");
   });
 
   it("identifies regular pricing", () => {
@@ -134,32 +128,48 @@ describe("checkItemEligibility", () => {
   it("marks item as eligible within window", () => {
     const result = checkItemEligibility(baseItem, "2025-01-01", "2025-01-15");
     expect(result.isEligible).toBe(true);
-    expect(result.reason).toContain("16 days remaining");
+    expect(result.reason).toContain("16 days left");
+    expect(result.hints).toEqual([]);
   });
 
   it("marks item as ineligible outside window", () => {
     const result = checkItemEligibility(baseItem, "2025-01-01", "2025-02-15");
     expect(result.isEligible).toBe(false);
-    expect(result.reason).toContain("Outside 30-day");
+    expect(result.reason).toContain("Outside the 30-day window");
   });
 
-  it("marks clearance items as ineligible", () => {
-    const clearanceItem = { ...baseItem, unitPrice: 24.97 };
+  it("keeps .97 items eligible with a hint", () => {
+    const clearanceItem = { ...baseItem, unitPrice: 24.97, shelfPrice: 24.97 };
     const result = checkItemEligibility(clearanceItem, "2025-01-01", "2025-01-15");
-    expect(result.isEligible).toBe(false);
-    expect(result.reason).toContain("Clearance");
+    expect(result.isEligible).toBe(true);
+    expect(result.hints[0]).toContain(".97");
   });
 
-  it("marks fuel as ineligible", () => {
+  it("checks the price ending on the shelf price, not the price after instant savings", () => {
+    // Shelf 12.99 with 3.02 off lands on 9.97. That is not a clearance price.
+    const saved = { ...baseItem, unitPrice: 9.97, totalPrice: 9.97, shelfPrice: 12.99 };
+    const result = checkItemEligibility(saved, "2025-01-01", "2025-01-15");
+    expect(result.hints).toEqual([]);
+  });
+
+  it("flags fuel with a soft hint instead of excluding it", () => {
     const fuelItem = { ...baseItem, description: "FUEL GASOLINE REG" };
     const result = checkItemEligibility(fuelItem, "2025-01-01", "2025-01-15");
-    expect(result.isEligible).toBe(false);
-    expect(result.reason).toContain("excluded");
+    expect(result.isEligible).toBe(true);
+    expect(result.hints.join(" ")).toContain("Unofficial");
   });
 
-  it("marks gift cards as ineligible", () => {
+  it("flags gift cards with a soft hint instead of excluding them", () => {
     const giftCard = { ...baseItem, description: "GIFT CARD $50" };
     const result = checkItemEligibility(giftCard, "2025-01-01", "2025-01-15");
+    expect(result.isEligible).toBe(true);
+    expect(result.hints.join(" ")).toContain("gift cards");
+  });
+
+  it("excludes precious metals, which Costco's page documents", () => {
+    const bar = { ...baseItem, description: "1OZ GOLD BAR" };
+    const result = checkItemEligibility(bar, "2025-01-01", "2025-01-15");
     expect(result.isEligible).toBe(false);
+    expect(result.reason).toContain("precious metals");
   });
 });

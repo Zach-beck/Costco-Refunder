@@ -262,8 +262,13 @@ function calculateOverallConfidence(
 }
 
 // ─── Price Ending Analysis ───────────────────────────────────────────────────
+//
+// Costco does not publish what price endings mean. Shoppers often read .97 as
+// a clearance markdown, and reports about .00 and .88 conflict. These are
+// unofficial hints only. They never remove a line from the check.
 
 import type { PriceEndingAnalysis } from "@costco-refunder/shared";
+import { ADJUSTMENT_WINDOW_DAYS } from "@costco-refunder/shared/types";
 
 export function analyzePriceEnding(price: number): PriceEndingAnalysis {
   const cents = Math.round((price % 1) * 100);
@@ -273,17 +278,8 @@ export function analyzePriceEnding(price: number): PriceEndingAnalysis {
     return {
       type: "clearance",
       ending,
-      isEligibleForAdjustment: false,
-      note: "Price ending .97 indicates manager's markdown/clearance. Typically not eligible for price adjustment.",
-    };
-  }
-
-  if (cents === 0 || cents === 88) {
-    return {
-      type: "manufacturer_special",
-      ending,
       isEligibleForAdjustment: true,
-      note: "Price ending .00 or .88 indicates a manufacturer special deal. Usually eligible for adjustment.",
+      note: "Unofficial hint: price ends in .97, which shoppers often read as clearance. Costco doesn't publish what endings mean and may decline clearance items. Ask.",
     };
   }
 
@@ -291,7 +287,7 @@ export function analyzePriceEnding(price: number): PriceEndingAnalysis {
     type: "regular",
     ending,
     isEligibleForAdjustment: true,
-    note: "Standard pricing. Eligible for price adjustment within window.",
+    note: "No price-ending hint.",
   };
 }
 
@@ -300,17 +296,29 @@ export function analyzePriceEnding(price: number): PriceEndingAnalysis {
 export interface EligibilityResult {
   isEligible: boolean;
   reason: string;
+  /** Unofficial hints to show next to the line. They never change eligibility. */
+  hints: string[];
 }
 
-const EXCLUDED_DESCRIPTION_PATTERNS = [
-  /\bFUEL\b/i,
-  /\bGAS\b/i,
-  /\bPHARMACY\b/i,
-  /\bRX\b/i,
-  /\bSPECIAL\s*ORDER\b/i,
-  /\bGIFT\s*CARD\b/i,
-  /\bTOBACCO\b/i,
-  /\bCIGAR/i,
+// Documented on Costco's US "Price Match" page: precious metals are not eligible.
+const HARD_EXCLUSIONS: { pattern: RegExp; reason: string }[] = [
+  {
+    pattern: /\b(GOLD|SILVER|PLATINUM)\b.*\b(BAR|COIN|ROUND)S?\b|\bBULLION\b/i,
+    reason: "Costco's price match page says precious metals are not eligible.",
+  },
+];
+
+// Not on Costco's price match page. Shopper reports only, so the line stays in
+// the check and gets a hint instead of being dropped.
+const SOFT_EXCLUSIONS: { pattern: RegExp; hint: string }[] = [
+  { pattern: /\bFUEL\b|\bGAS\b|\bGASOLINE\b/i, hint: "Unofficial: fuel is likely not adjustable. Ask." },
+  { pattern: /\bPHARMACY\b|\bRX\b/i, hint: "Unofficial: pharmacy items are likely not adjustable. Ask." },
+  { pattern: /\bTOBACCO\b|\bCIGAR/i, hint: "Unofficial: tobacco is likely not adjustable. Ask." },
+  { pattern: /\bGIFT\s*CARD\b/i, hint: "Unofficial: gift cards are likely not adjustable. Ask." },
+  {
+    pattern: /\bSPECIAL\s*ORDER\b/i,
+    hint: "Special Order Kiosk and installed products follow separate Costco rules. Check with the dealer.",
+  },
 ];
 
 export function checkItemEligibility(
@@ -318,48 +326,57 @@ export function checkItemEligibility(
   purchaseDate: string,
   currentDate: string = new Date().toISOString().split("T")[0]
 ): EligibilityResult {
-  // Check price ending
-  const priceAnalysis = analyzePriceEnding(item.unitPrice);
-  if (!priceAnalysis.isEligibleForAdjustment) {
-    return {
-      isEligible: false,
-      reason: `Clearance item (price ends in ${priceAnalysis.ending}). Not eligible for price adjustment.`,
-    };
+  const hints: string[] = [];
+
+  // Price-ending hint runs on the shelf price, before any instant savings.
+  const priceAnalysis = analyzePriceEnding(item.shelfPrice ?? item.unitPrice);
+  if (priceAnalysis.type === "clearance") {
+    hints.push(priceAnalysis.note);
   }
 
-  // Check excluded categories
-  for (const pattern of EXCLUDED_DESCRIPTION_PATTERNS) {
-    if (pattern.test(item.description)) {
-      return {
-        isEligible: false,
-        reason: `Item category excluded from price adjustment policy.`,
-      };
+  for (const rule of HARD_EXCLUSIONS) {
+    if (rule.pattern.test(item.description)) {
+      return { isEligible: false, reason: rule.reason, hints };
     }
   }
 
-  // Check time window
+  for (const rule of SOFT_EXCLUSIONS) {
+    if (rule.pattern.test(item.description)) {
+      hints.push(rule.hint);
+    }
+  }
+
   const purchase = new Date(purchaseDate);
   const now = new Date(currentDate);
   const daysDiff = Math.floor(
     (now.getTime() - purchase.getTime()) / (1000 * 60 * 60 * 24)
   );
 
-  if (daysDiff > 30) {
+  if (daysDiff > ADJUSTMENT_WINDOW_DAYS) {
     return {
       isEligible: false,
-      reason: `Outside 30-day adjustment window (${daysDiff} days since purchase).`,
+      reason: `Outside the ${ADJUSTMENT_WINDOW_DAYS}-day window (${daysDiff} days since purchase).`,
+      hints,
     };
   }
 
   if (daysDiff < 0) {
-    return {
-      isEligible: false,
-      reason: `Purchase date is in the future.`,
-    };
+    return { isEligible: false, reason: "Purchase date is in the future.", hints };
   }
 
   return {
     isEligible: true,
-    reason: `Eligible. ${30 - daysDiff} days remaining in adjustment window.`,
+    reason: `Inside the window. ${ADJUSTMENT_WINDOW_DAYS - daysDiff} days left.`,
+    hints,
   };
+}
+
+// ─── Receipt kind ────────────────────────────────────────────────────────────
+
+/** True for a Costco gas station receipt. Fuel is not checked for price drops. */
+export function isFuelReceipt(text: string): boolean {
+  return (
+    /Gas\s+Station\s+Receipt/i.test(text) ||
+    (/\bGallons\b/i.test(text) && /\/\s*gal\b/i.test(text))
+  );
 }

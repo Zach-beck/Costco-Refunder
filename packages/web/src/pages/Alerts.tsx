@@ -89,6 +89,7 @@ export function AlertsPage() {
                   <span className="text-sm font-bold">
                     {alert.savings.toFixed(2)}
                   </span>
+                  <span className="text-[10px] text-gray-500">Costco decides</span>
                 </div>
               </div>
 
