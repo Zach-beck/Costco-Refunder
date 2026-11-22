@@ -15,7 +15,7 @@ local:
 
 # Compare a receipt file to a price file
 refund:
-	yarn refund -- --receipt fixtures/sample-receipt.txt --prices fixtures/public-prices.csv --as-of 2026-11-15
+	yarn refund --receipt fixtures/sample-receipt.txt --prices fixtures/public-prices.csv --as-of 2026-11-15
 
 # Stop infrastructure
 stop:
