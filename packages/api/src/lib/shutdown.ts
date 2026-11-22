@@ -1,13 +1,11 @@
 import type { FastifyInstance } from "fastify";
-import type { Worker } from "bullmq";
-import type IORedis from "ioredis";
 
 let registered = false;
 
 export function registerShutdown(
   app: FastifyInstance,
-  workers: Worker[],
-  redis: IORedis
+  workers: { close: () => Promise<unknown> }[],
+  redis: { quit: () => Promise<unknown> }
 ): void {
   if (registered) return;
   registered = true;

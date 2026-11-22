@@ -2,7 +2,7 @@ import type { ParsedReceipt, ParsedReceiptItem } from "@costco-refunder/shared";
 
 /**
  * Parse a Costco digital receipt email body (plain text or HTML).
- * Digital receipts have perfect structure — no OCR confidence issues.
+ * Digital receipts have a stable structure, so this path does not use OCR.
  */
 export function parseEmailReceipt(emailBody: string): ParsedReceipt {
   const isHtml = emailBody.includes("<html") || emailBody.includes("<table");
@@ -24,7 +24,7 @@ export function parseEmailReceipt(emailBody: string): ParsedReceipt {
   const WAREHOUSE_PATTERN = /(?:warehouse|location)\s*#?\s*(\d{1,4})/i;
   const SUBTOTAL_PATTERN = /subtotal\s*\$?([\d,]+\.\d{2})/i;
   const TAX_PATTERN = /tax\s*\$?([\d,]+\.\d{2})/i;
-  const TOTAL_PATTERN = /total\s*\$?([\d,]+\.\d{2})/i;
+  const TOTAL_PATTERN = /(?:^|[^a-z])total\s*\$?([\d,]+\.\d{2})/i;
 
   let pendingQty: { qty: number; unitPrice: number } | null = null;
 
@@ -82,7 +82,7 @@ export function parseEmailReceipt(emailBody: string): ParsedReceipt {
         unitPrice,
         totalPrice,
         isTaxable: false, // Email receipts don't always show tax indicators
-        confidence: 1.0, // Perfect confidence — no OCR
+        confidence: 1.0,
       });
       continue;
     }

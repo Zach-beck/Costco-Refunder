@@ -32,9 +32,10 @@ export async function settingsRoutes(app: FastifyInstance) {
           .send({ success: false, error: parsed.error.issues[0].message });
       }
 
-      const updates: Record<string, any> = { updatedAt: new Date() };
-      if (parsed.data.costcoMemberId !== undefined)
-        updates.costcoMemberId = parsed.data.costcoMemberId;
+      const updates: Record<string, any> = {
+        updatedAt: new Date(),
+        costcoMemberId: null,
+      };
       if (parsed.data.homeWarehouseId !== undefined)
         updates.homeWarehouseId = parsed.data.homeWarehouseId;
       if (parsed.data.notificationPrefs !== undefined)
@@ -104,7 +105,7 @@ export async function settingsRoutes(app: FastifyInstance) {
           .send({ success: false, error: "Invalid push subscription" });
       }
 
-      // Upsert — avoid duplicate endpoints
+      // Insert when this endpoint is new.
       const existing = await db
         .select()
         .from(pushSubscriptions)

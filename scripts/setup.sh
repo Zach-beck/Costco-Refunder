@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-echo "=== Costco Refunder — Setup ==="
+echo "=== Costco Refunder setup ==="
 echo ""
 
 # Check prerequisites

@@ -19,7 +19,7 @@ export async function authRoutes(app: FastifyInstance) {
         .send({ success: false, error: parsed.error.issues[0].message });
     }
 
-    const { email, password, costcoMemberId, homeWarehouseId } = parsed.data;
+    const { email, password, homeWarehouseId } = parsed.data;
 
     // Check if user already exists
     const existing = await db
@@ -41,7 +41,6 @@ export async function authRoutes(app: FastifyInstance) {
       .values({
         email: email.toLowerCase(),
         passwordHash,
-        costcoMemberId,
         homeWarehouseId,
       })
       .returning({ id: users.id });

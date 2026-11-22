@@ -1,3 +1,5 @@
+import { isLocalMode } from "./mode.js";
+
 const REQUIRED_VARS = [
   "DATABASE_URL",
   "REDIS_URL",
@@ -22,6 +24,18 @@ const OPTIONAL_VARS = [
 ] as const;
 
 export function validateEnv(): void {
+  if (isLocalMode()) {
+    if (
+      !process.env.SESSION_SECRET ||
+      process.env.SESSION_SECRET === "change-me-in-production"
+    ) {
+      console.warn(
+        "[WARN] SESSION_SECRET is still the example value. Fine for this machine, not for a shared server."
+      );
+    }
+    return;
+  }
+
   const missing: string[] = [];
 
   for (const key of REQUIRED_VARS) {
@@ -46,6 +60,6 @@ export function validateEnv(): void {
       console.error("[FATAL] SESSION_SECRET must be set in production");
       process.exit(1);
     }
-    console.warn("[WARN] Using default SESSION_SECRET — not safe for production");
+    console.warn("[WARN] Using default SESSION_SECRET. Not safe for production.");
   }
 }

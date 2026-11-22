@@ -9,7 +9,7 @@ function generateToken(): string {
   return crypto.randomBytes(TOKEN_LENGTH).toString("hex");
 }
 
-export async function csrfPlugin(app: FastifyInstance) {
+export async function registerCsrf(app: FastifyInstance) {
   // Issue a CSRF token cookie on every response if not already set
   app.addHook("onRequest", async (request: FastifyRequest, reply: FastifyReply) => {
     const existing = request.cookies[CSRF_COOKIE];
@@ -39,7 +39,7 @@ export async function csrfPlugin(app: FastifyInstance) {
     const headerToken = request.headers[CSRF_HEADER] as string | undefined;
 
     if (!cookieToken || !headerToken || cookieToken !== headerToken) {
-      reply.status(403).send({ success: false, error: "Invalid CSRF token" });
+      return reply.status(403).send({ success: false, error: "Invalid CSRF token" });
     }
   });
 }

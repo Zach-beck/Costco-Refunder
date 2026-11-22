@@ -1,4 +1,6 @@
 import type { FastifyInstance } from "fastify";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { eq, and, desc } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import {
@@ -9,9 +11,13 @@ import {
   ADJUSTMENT_WINDOW_DAYS,
 } from "@costco-refunder/shared";
 import { db } from "../lib/db.js";
-import { getUploadUrl, getDownloadUrl } from "../lib/s3.js";
+import { getUploadUrl, getDownloadUrl, putObject, readLocalObject } from "../lib/s3.js";
 import { requireAuth } from "../lib/auth.js";
-import { receiptQueue } from "../workers/queues.js";
+import { isLocalMode } from "../lib/mode.js";
+import { ingestReceiptText } from "../lib/ingest.js";
+import { processReceiptImageJob } from "../lib/process-image.js";
+import { asDateString, daysAgoIso, isoToMdy } from "../lib/dates.js";
+import { repoRoot } from "../lib/paths.js";
 
 export async function receiptRoutes(app: FastifyInstance) {
   // Get presigned upload URL
@@ -66,14 +72,32 @@ export async function receiptRoutes(app: FastifyInstance) {
         })
         .returning();
 
-      // Queue the receipt for OCR + parsing
-      await receiptQueue.add("parse-receipt", {
-        receiptId: receipt.id,
-        imageKey,
-        userId,
-      });
+      if (isLocalMode()) {
+        try {
+          await processReceiptImageJob(receipt.id, imageKey, userId);
+        } catch (error) {
+          await db
+            .update(receipts)
+            .set({ parseStatus: "failed" })
+            .where(eq(receipts.id, receipt.id));
+          request.log.error(error);
+        }
+      } else {
+        const { receiptQueue } = await import("../workers/queues.js");
+        await receiptQueue.add("parse-receipt", {
+          receiptId: receipt.id,
+          imageKey,
+          userId,
+        });
+      }
 
-      reply.status(201).send({ success: true, data: receipt });
+      const [stored] = await db
+        .select()
+        .from(receipts)
+        .where(eq(receipts.id, receipt.id))
+        .limit(1);
+
+      reply.status(201).send({ success: true, data: presentReceipt(stored ?? receipt) });
     }
   );
 
@@ -104,7 +128,7 @@ export async function receiptRoutes(app: FastifyInstance) {
 
       reply.send({
         success: true,
-        data: { ...receipt, items: parsedItems },
+        data: { ...presentReceipt(receipt), items: parsedItems },
       });
     }
   );
@@ -130,7 +154,10 @@ export async function receiptRoutes(app: FastifyInstance) {
         .limit(parseInt(limit))
         .offset(offset);
 
-      reply.send({ success: true, data: userReceipts });
+      reply.send({
+        success: true,
+        data: userReceipts.map((row) => presentReceipt(row)),
+      });
     }
   );
 
@@ -306,6 +333,12 @@ export async function receiptRoutes(app: FastifyInstance) {
           .send({ success: false, error: "Receipt not found" });
       }
 
+      if (receipt.imageUrl.startsWith("text:")) {
+        return reply
+          .status(404)
+          .send({ success: false, error: "This receipt was pasted as text and has no photo." });
+      }
+
       const imageUrl = await getDownloadUrl(receipt.imageUrl);
       reply.send({ success: true, data: { imageUrl } });
     }
@@ -365,4 +398,95 @@ export async function receiptRoutes(app: FastifyInstance) {
       reply.send({ success: true });
     }
   );
+
+  app.post(
+    "/api/receipts/text",
+    { preHandler: [requireAuth] },
+    async (request, reply) => {
+      const userId = (request as any).userId;
+      const body = request.body as {
+        text?: string;
+        warehouseId?: number;
+        receiptDate?: string;
+      };
+      if (!body?.text || !body.text.trim()) {
+        return reply.status(400).send({ success: false, error: "text is required" });
+      }
+      const result = await ingestReceiptText({
+        userId,
+        text: body.text,
+        warehouseId: body.warehouseId,
+        receiptDate: body.receiptDate,
+      });
+      reply.status(201).send({ success: true, data: result });
+    }
+  );
+
+  app.post(
+    "/api/receipts/sample",
+    { preHandler: [requireAuth] },
+    async (request, reply) => {
+      const userId = (request as any).userId;
+      const purchaseDate = daysAgoIso(10);
+      const text = readFileSync(join(repoRoot(), "fixtures/sample-receipt.txt"), "utf8").replace(
+        /\d{1,2}\/\d{1,2}\/\d{2,4}/,
+        isoToMdy(purchaseDate)
+      );
+      const result = await ingestReceiptText({
+        userId,
+        text,
+        imageKey: "text:sample",
+        receiptDate: purchaseDate,
+      });
+      reply.status(201).send({ success: true, data: result });
+    }
+  );
+
+  app.put(
+    "/api/local-uploads",
+    { preHandler: [requireAuth] },
+    async (request, reply) => {
+      if (!isLocalMode()) {
+        return reply.status(404).send({ success: false, error: "Not found" });
+      }
+      const key = (request.query as { key?: string }).key;
+      if (!key || !Buffer.isBuffer(request.body)) {
+        return reply.status(400).send({ success: false, error: "Upload key and body are required" });
+      }
+      await putObject(key, request.body as Buffer);
+      reply.send({ success: true });
+    }
+  );
+
+  app.get(
+    "/api/local-files",
+    { preHandler: [requireAuth] },
+    async (request, reply) => {
+      const key = (request.query as { key?: string }).key;
+      if (!key || key.startsWith("text:")) {
+        return reply.status(404).send({ success: false, error: "No image for this receipt" });
+      }
+      try {
+        const body = readLocalObject(key);
+        const type = key.endsWith(".png")
+          ? "image/png"
+          : key.endsWith(".webp")
+            ? "image/webp"
+            : "image/jpeg";
+        reply.header("content-type", type).send(body);
+      } catch {
+        reply.status(404).send({ success: false, error: "File not found" });
+      }
+    }
+  );
+}
+
+function presentReceipt<T extends { receiptDate: unknown; adjustmentWindowEnd: unknown }>(
+  row: T
+) {
+  return {
+    ...row,
+    receiptDate: asDateString(row.receiptDate),
+    adjustmentWindowEnd: asDateString(row.adjustmentWindowEnd),
+  };
 }

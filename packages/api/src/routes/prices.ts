@@ -9,8 +9,69 @@ import {
   warehouses,
   ManualPriceEntrySchema,
 } from "@costco-refunder/shared";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { parsePriceCatalogCsv, parsePublicPriceHtml } from "@costco-refunder/parser/text";
 import { db } from "../lib/db.js";
 import { requireAuth } from "../lib/auth.js";
+import { checkForAlerts, ensureWarehouse } from "../lib/alerts.js";
+import { asDateString, daysAgoIso } from "../lib/dates.js";
+import { repoRoot } from "../lib/paths.js";
+
+async function importPriceContent(
+  userId: string,
+  input: {
+    format?: "csv" | "html";
+    content: string;
+    warehouseId?: number;
+    observedDate?: string;
+  }
+) {
+  const today = new Date().toISOString().slice(0, 10);
+  const format =
+    input.format || (/<article|<table|<tr/i.test(input.content) ? "html" : "csv");
+  const defaults = {
+    warehouseId: input.warehouseId ?? null,
+    observedDate: input.observedDate || today,
+  };
+  const catalog =
+    format === "html"
+      ? parsePublicPriceHtml(input.content, defaults)
+      : parsePriceCatalogCsv(input.content, defaults);
+
+  let imported = 0;
+  let alertsCreated = 0;
+
+  for (const price of catalog) {
+    const warehouseId = price.warehouseId ?? input.warehouseId ?? null;
+    if (!warehouseId) continue;
+    const observedDate = price.observedDate || defaults.observedDate || today;
+    await ensureWarehouse(warehouseId);
+    await db
+      .insert(items)
+      .values({
+        id: price.itemNumber,
+        description: price.description || null,
+        firstSeen: observedDate,
+        lastSeen: observedDate,
+      })
+      .onConflictDoNothing();
+
+    await db.insert(priceObservations).values({
+      itemId: price.itemNumber,
+      warehouseId,
+      price: price.price.toString(),
+      observedDate,
+      source: format === "html" ? "public_page" : "catalog_import",
+      reportedBy: userId,
+      verified: true,
+    });
+    imported++;
+    alertsCreated += await checkForAlerts(price.itemNumber, warehouseId, price.price);
+  }
+
+  return { imported, alertsCreated };
+}
 
 export async function priceRoutes(app: FastifyInstance) {
   // Submit a manual price observation ("I spotted a lower price")
@@ -133,7 +194,7 @@ export async function priceRoutes(app: FastifyInstance) {
           originalPrice: parseFloat(row.alert.originalPrice),
           newPrice: parseFloat(row.alert.newPrice),
           savings: parseFloat(row.alert.savings),
-          eligibleUntil: row.alert.eligibleUntil,
+          eligibleUntil: asDateString(row.alert.eligibleUntil),
           daysRemaining,
           status: row.alert.status,
           warehouseName: row.warehouse?.name ?? "Unknown",
@@ -231,8 +292,8 @@ export async function priceRoutes(app: FastifyInstance) {
       const guide = {
         itemDescription: result.item.descriptionRaw,
         itemNumber: result.item.itemId,
-        purchaseDate: result.receipt.receiptDate,
-        deadline: result.alert.eligibleUntil,
+        purchaseDate: asDateString(result.receipt.receiptDate),
+        deadline: asDateString(result.alert.eligibleUntil),
         daysRemaining,
         originalPrice: parseFloat(result.alert.originalPrice),
         newPrice: parseFloat(result.alert.newPrice),
@@ -244,13 +305,13 @@ export async function priceRoutes(app: FastifyInstance) {
           {
             stepNumber: 1,
             title: "Gather your info",
-            description: `Item #${result.item.itemId} — "${result.item.descriptionRaw}". Purchased on ${result.receipt.receiptDate} for $${result.alert.originalPrice}. Current price: $${result.alert.newPrice}.`,
+            description: `Item #${result.item.itemId}, "${result.item.descriptionRaw}". Purchased on ${asDateString(result.receipt.receiptDate)} for $${result.alert.originalPrice}. Current price: $${result.alert.newPrice}.`,
             actionType: "info",
           },
           {
             stepNumber: 2,
             title: "Visit the Membership Counter",
-            description: `Go to ${result.warehouse?.name ?? "your Costco warehouse"} and visit the Membership/Returns counter. Bring your Costco membership card. No receipt needed — they can look it up by membership number.`,
+            description: `Go to ${result.warehouse?.name ?? "your Costco warehouse"} and visit the membership counter. Bring your membership card. Costco can look the purchase up from the card. This app does not contact Costco.`,
             actionType: "visit",
           },
           {
@@ -268,7 +329,7 @@ export async function priceRoutes(app: FastifyInstance) {
           {
             stepNumber: 5,
             title: "Deadline",
-            description: `You must request this adjustment by ${result.alert.eligibleUntil} (${daysRemaining} days remaining). We recommend claiming at least 2 days before the deadline.`,
+            description: `You must request this adjustment by ${asDateString(result.alert.eligibleUntil)} (${daysRemaining} days remaining). Claiming a couple of days before the deadline leaves room if the counter is busy.`,
             actionType: "info",
           },
         ],
@@ -277,73 +338,56 @@ export async function priceRoutes(app: FastifyInstance) {
       reply.send({ success: true, data: guide });
     }
   );
-}
 
-// ─── Internal helper: check if new price observation triggers alerts ─────────
+  app.post(
+    "/api/prices/import",
+    { preHandler: [requireAuth] },
+    async (request, reply) => {
+      const userId = (request as any).userId;
+      const body = request.body as {
+        format?: "csv" | "html";
+        content?: string;
+        warehouseId?: number;
+        observedDate?: string;
+      };
 
-async function checkForAlerts(
-  itemId: number,
-  warehouseId: number,
-  newPrice: number
-) {
-  const today = new Date().toISOString().split("T")[0];
-
-  // Find all users tracking this item at this warehouse within their window
-  const trackedByUsers = await db
-    .select({
-      receiptItem: receiptItems,
-      receipt: receipts,
-    })
-    .from(receiptItems)
-    .innerJoin(receipts, eq(receiptItems.receiptId, receipts.id))
-    .where(
-      and(
-        eq(receiptItems.itemId, itemId),
-        eq(receiptItems.trackingActive, true),
-        eq(receiptItems.isEligible, true),
-        gte(receipts.adjustmentWindowEnd, today),
-        eq(receipts.warehouseId, warehouseId)
-      )
-    );
-
-  for (const { receiptItem, receipt } of trackedByUsers) {
-    const originalPrice = parseFloat(receiptItem.unitPrice);
-    if (newPrice >= originalPrice) continue;
-
-    // Check if alert already exists
-    const [existing] = await db
-      .select()
-      .from(priceAlerts)
-      .where(
-        and(
-          eq(priceAlerts.receiptItemId, receiptItem.id),
-          eq(priceAlerts.status, "pending")
-        )
-      )
-      .limit(1);
-
-    if (existing) {
-      // Update if new price is even lower
-      if (newPrice < parseFloat(existing.newPrice)) {
-        await db
-          .update(priceAlerts)
-          .set({
-            newPrice: newPrice.toString(),
-            savings: (originalPrice - newPrice).toString(),
-          })
-          .where(eq(priceAlerts.id, existing.id));
+      if (!body?.content || !body.content.trim()) {
+        return reply.status(400).send({ success: false, error: "content is required" });
       }
-      continue;
-    }
 
-    // Create new alert
-    await db.insert(priceAlerts).values({
-      userId: receipt.userId,
-      receiptItemId: receiptItem.id,
-      originalPrice: originalPrice.toString(),
-      newPrice: newPrice.toString(),
-      savings: (originalPrice - newPrice).toString(),
-      eligibleUntil: receipt.adjustmentWindowEnd!,
-    });
-  }
+      const result = await importPriceContent(userId, {
+        format: body.format,
+        content: body.content,
+        warehouseId: body.warehouseId,
+        observedDate: body.observedDate,
+      });
+      reply.send({ success: true, data: result });
+    }
+  );
+
+  app.post(
+    "/api/prices/sample",
+    { preHandler: [requireAuth] },
+    async (request, reply) => {
+      const userId = (request as any).userId;
+      const csv = readFileSync(join(repoRoot(), "fixtures/public-prices.csv"), "utf8");
+      const observedDate = daysAgoIso(1);
+      const shifted = csv
+        .split(/\r?\n/)
+        .map((line, index) => {
+          if (index === 0 || !line.trim()) return line;
+          const cells = line.split(",");
+          if (cells.length >= 5) cells[4] = observedDate;
+          return cells.join(",");
+        })
+        .join("\n");
+
+      const result = await importPriceContent(userId, {
+        format: "csv",
+        content: shifted,
+        observedDate,
+      });
+      reply.send({ success: true, data: result });
+    }
+  );
 }

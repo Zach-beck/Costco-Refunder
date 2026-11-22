@@ -13,10 +13,12 @@ interface ReceiptItem {
   isTaxable: boolean;
   ocrConfidence: number;
   trackingActive: boolean;
+  isEligible: boolean;
 }
 
 interface Receipt {
   id: string;
+  imageUrl?: string;
   warehouseId: number | null;
   receiptDate: string;
   parseStatus: string;
@@ -130,13 +132,15 @@ export function ReceiptDetailPage() {
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-gray-900">Receipt Details</h2>
         <div className="flex items-center gap-2">
-          <button
-            onClick={handleViewImage}
-            className="p-2 text-gray-500 hover:text-brand-600 rounded-lg hover:bg-gray-100"
-            title="View receipt image"
-          >
-            <Image size={18} />
-          </button>
+          {receipt.imageUrl && !receipt.imageUrl.startsWith("text:") && (
+            <button
+              onClick={handleViewImage}
+              className="p-2 text-gray-500 hover:text-brand-600 rounded-lg hover:bg-gray-100"
+              title="View receipt image"
+            >
+              <Image size={18} />
+            </button>
+          )}
           <button
             onClick={handleDelete}
             disabled={deleting}
@@ -187,7 +191,7 @@ export function ReceiptDetailPage() {
             </div>
             <div>
               <p className="text-gray-500">Total</p>
-              <p className="font-medium">{receipt.total ? `$${receipt.total}` : "—"}</p>
+              <p className="font-medium">{receipt.total ? `$${receipt.total}` : "n/a"}</p>
             </div>
             <div>
               <p className="text-gray-500">Parse Confidence</p>
@@ -226,6 +230,7 @@ export function ReceiptDetailPage() {
                     <p className="text-xs text-gray-500">
                       #{item.itemId} &middot; Qty: {item.quantity}
                       {item.isTaxable && " &middot; Taxable"}
+                      {item.isEligible === false && " &middot; Not eligible"}
                     </p>
                   </div>
 

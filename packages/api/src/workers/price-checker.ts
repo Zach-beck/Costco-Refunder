@@ -141,7 +141,7 @@ export const priceCheckerWorker = new Worker<PriceCheckJob>(
     return { checked: trackedItems.length, alertsCreated, expired: expiredCount };
   },
   {
-    connection: redis,
+    connection: redis as never,
     concurrency: 1,
   }
 );
