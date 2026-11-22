@@ -11,7 +11,7 @@ import {
 import { redis } from "../lib/redis.js";
 import { db } from "../lib/db.js";
 
-// Conditional imports — these may not be configured in all environments
+// Optional providers. They stay unloaded when the keys are absent.
 let webpush: typeof import("web-push") | null = null;
 let resend: any = null;
 
@@ -128,7 +128,7 @@ export const notificationWorker = new Worker<NotificationJob>(
       .where(eq(priceAlerts.id, alertId));
   },
   {
-    connection: redis,
+    connection: redis as never,
     concurrency: 5,
   }
 );

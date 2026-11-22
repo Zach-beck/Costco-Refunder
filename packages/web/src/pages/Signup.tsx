@@ -135,7 +135,7 @@ export function SignupPage() {
               <option value="">Skip for now</option>
               {filteredWarehouses.map((w) => (
                 <option key={w.id} value={w.id}>
-                  {w.name} — {w.city}, {w.state}
+                  {w.name} - {w.city}, {w.state}
                 </option>
               ))}
             </select>

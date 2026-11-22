@@ -55,7 +55,11 @@ export const ManualPriceEntrySchema = z.object({
 
 export type ManualPriceEntry = z.infer<typeof ManualPriceEntrySchema>;
 
-export type PriceSource = "receipt_upload" | "manual_entry" | "web_scrape";
+export type PriceSource =
+  | "receipt_upload"
+  | "manual_entry"
+  | "public_page"
+  | "catalog_import";
 
 // ─── Price Alerts ────────────────────────────────────────────────────────────
 

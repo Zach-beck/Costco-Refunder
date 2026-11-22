@@ -5,7 +5,6 @@ import { Save, Download, Bell, BellOff } from "lucide-react";
 
 export function SettingsPage() {
   const { user, checkAuth } = useStore();
-  const [memberId, setMemberId] = useState(user?.costcoMemberId || "");
   const [warehouseId, setWarehouseId] = useState<string>(
     user?.homeWarehouseId?.toString() || ""
   );
@@ -54,7 +53,6 @@ export function SettingsPage() {
     setSaved(false);
 
     const res = await api.updateProfile({
-      costcoMemberId: memberId || null,
       homeWarehouseId: warehouseId ? parseInt(warehouseId) : null,
       notificationPrefs: { email: emailNotifs, push: pushNotifs },
     });
@@ -151,17 +149,10 @@ export function SettingsPage() {
         </div>
 
         <div className="p-4">
-          <label htmlFor="memberId" className="block text-sm font-medium text-gray-700 mb-1">
-            Costco Member ID
-          </label>
-          <input
-            id="memberId"
-            type="text"
-            value={memberId}
-            onChange={(e) => setMemberId(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none text-sm"
-            placeholder="Optional — helps identify purchases"
-          />
+          <p className="text-sm font-medium text-gray-700">Membership card</p>
+          <p className="text-xs text-gray-500 mt-1">
+            Keep your membership number on the card. This app does not store it.
+          </p>
         </div>
 
         <div className="p-4">
@@ -184,7 +175,7 @@ export function SettingsPage() {
             <option value="">No warehouse selected</option>
             {filteredWarehouses.map((w) => (
               <option key={w.id} value={w.id}>
-                #{w.id} — {w.name}, {w.city}, {w.state}
+                #{w.id} - {w.name}, {w.city}, {w.state}
               </option>
             ))}
           </select>

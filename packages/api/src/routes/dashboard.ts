@@ -156,7 +156,7 @@ export async function dashboardRoutes(app: FastifyInstance) {
             latestObservedPrice: latestPrice,
             priceDrop:
               latestPrice !== null && latestPrice < purchasePrice
-                ? purchasePrice - latestPrice
+                ? Math.round((purchasePrice - latestPrice) * 100) / 100
                 : null,
           };
         })

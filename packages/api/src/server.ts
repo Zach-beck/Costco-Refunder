@@ -1,3 +1,4 @@
+import "./lib/load-env.js";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import cookie from "@fastify/cookie";
@@ -5,33 +6,27 @@ import rateLimit from "@fastify/rate-limit";
 import { validateEnv } from "./lib/env.js";
 import { redis } from "./lib/redis.js";
 import { registerShutdown } from "./lib/shutdown.js";
-import { csrfPlugin } from "./lib/csrf.js";
+import { registerCsrf } from "./lib/csrf.js";
+import { isLocalMode } from "./lib/mode.js";
 import { authRoutes } from "./routes/auth.js";
 import { receiptRoutes } from "./routes/receipts.js";
 import { priceRoutes } from "./routes/prices.js";
 import { dashboardRoutes } from "./routes/dashboard.js";
 import { settingsRoutes } from "./routes/settings.js";
-import { priceCheckQueue } from "./workers/queues.js";
 
-// Validate environment before anything else
 validateEnv();
-
-// Import workers to start them
-import { receiptWorker } from "./workers/receipt-worker.js";
-import { priceCheckerWorker } from "./workers/price-checker.js";
-import { notificationWorker } from "./workers/notification-worker.js";
 
 const app = Fastify({
   logger: {
-    level: process.env.NODE_ENV === "production" ? "info" : "debug",
+    level: process.env.NODE_ENV === "production" ? "info" : "info",
     transport:
       process.env.NODE_ENV !== "production"
         ? { target: "pino-pretty" }
         : undefined,
   },
+  bodyLimit: 8 * 1024 * 1024,
 });
 
-// Plugins
 await app.register(cors, {
   origin: process.env.WEB_URL || "http://localhost:5173",
   credentials: true,
@@ -46,10 +41,25 @@ await app.register(rateLimit, {
   timeWindow: "1 minute",
 });
 
-// CSRF protection for state-changing requests
-await app.register(csrfPlugin);
+await registerCsrf(app);
 
-// Stricter rate limit on auth endpoints (5 attempts per minute)
+if (isLocalMode()) {
+  app.addContentTypeParser(
+    [
+      "image/png",
+      "image/jpeg",
+      "image/jpg",
+      "image/webp",
+      "image/heic",
+      "application/octet-stream",
+    ],
+    { parseAs: "buffer" },
+    (_request, body, done) => {
+      done(null, body);
+    }
+  );
+}
+
 app.addHook("onRequest", async (request, reply) => {
   if (request.url === "/api/auth/login" && request.method === "POST") {
     const key = `login-limit:${request.ip}`;
@@ -64,7 +74,6 @@ app.addHook("onRequest", async (request, reply) => {
   }
 });
 
-// Global error handler
 app.setErrorHandler((error: any, request, reply) => {
   const statusCode = error.statusCode ?? 500;
   if (statusCode >= 500) {
@@ -76,18 +85,29 @@ app.setErrorHandler((error: any, request, reply) => {
   });
 });
 
-// Routes
 await app.register(authRoutes);
 await app.register(receiptRoutes);
 await app.register(priceRoutes);
 await app.register(dashboardRoutes);
 await app.register(settingsRoutes);
 
-// Health check
-app.get("/api/health", async () => ({ status: "ok", timestamp: new Date().toISOString() }));
+app.get("/api/health", async () => ({
+  status: "ok",
+  mode: isLocalMode() ? "local" : "server",
+  timestamp: new Date().toISOString(),
+}));
 
-// Schedule recurring price checks (every 6 hours)
-async function schedulePriceChecks() {
+const workers: { close: () => Promise<unknown> }[] = [];
+
+if (!isLocalMode()) {
+  const [{ receiptWorker }, { priceCheckerWorker }, { notificationWorker }, { priceCheckQueue }] =
+    await Promise.all([
+      import("./workers/receipt-worker.js"),
+      import("./workers/price-checker.js"),
+      import("./workers/notification-worker.js"),
+      import("./workers/queues.js"),
+    ]);
+  workers.push(receiptWorker, priceCheckerWorker, notificationWorker);
   await priceCheckQueue.upsertJobScheduler(
     "price-check-scheduler",
     { every: 6 * 60 * 60 * 1000 },
@@ -95,21 +115,16 @@ async function schedulePriceChecks() {
   );
 }
 
-// Graceful shutdown
-registerShutdown(
-  app,
-  [receiptWorker, priceCheckerWorker, notificationWorker],
-  redis
-);
+registerShutdown(app, workers, redis);
 
-// Start server
 const port = parseInt(process.env.PORT || "3001");
 const host = process.env.HOST || "0.0.0.0";
 
 try {
   await app.listen({ port, host });
-  await schedulePriceChecks();
-  console.log(`API server running on http://${host}:${port}`);
+  console.log(
+    `API server running on http://${host}:${port} (${isLocalMode() ? "local mode" : "server mode"})`
+  );
 } catch (err) {
   app.log.error(err);
   process.exit(1);

@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDropzone } from "react-dropzone";
 import { Upload as UploadIcon, Camera, Image, Loader2 } from "lucide-react";
@@ -10,7 +10,68 @@ export function UploadPage() {
   const [state, setState] = useState<UploadState>("idle");
   const [error, setError] = useState("");
   const [preview, setPreview] = useState<string | null>(null);
+  const [receiptText, setReceiptText] = useState("");
+  const [priceText, setPriceText] = useState("");
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
   const navigate = useNavigate();
+
+  async function submitText(event: FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    setNote("");
+    setError("");
+    const res = await api.submitReceiptText({ text: receiptText });
+    setBusy(false);
+    if (!res.success || !res.data) {
+      setError(res.error || "Could not read that receipt");
+      return;
+    }
+    navigate(`/receipts/${res.data.receiptId}`);
+  }
+
+  async function useSampleReceipt() {
+    setBusy(true);
+    setNote("");
+    const res = await api.loadSampleReceipt();
+    setBusy(false);
+    if (!res.success || !res.data) {
+      setError(res.error || "Could not load the sample receipt");
+      return;
+    }
+    navigate(`/receipts/${res.data.receiptId}`);
+  }
+
+  async function submitPrices(event: FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    setNote("");
+    const format = /<article|<table|<tr/i.test(priceText) ? "html" : "csv";
+    const res = await api.importPrices({ format, content: priceText });
+    setBusy(false);
+    if (!res.success || !res.data) {
+      setError(res.error || "Could not import prices");
+      return;
+    }
+    setNote(
+      `Imported ${res.data.imported} prices. ${res.data.alertsCreated} new alert${res.data.alertsCreated === 1 ? "" : "s"}.`
+    );
+    setPriceText("");
+  }
+
+  async function useSamplePrices() {
+    setBusy(true);
+    setNote("");
+    const res = await api.loadSamplePrices();
+    setBusy(false);
+    if (!res.success || !res.data) {
+      setError(res.error || "Could not load sample prices");
+      return;
+    }
+    setNote(
+      `Imported ${res.data.imported} sample prices. ${res.data.alertsCreated} new alert${res.data.alertsCreated === 1 ? "" : "s"}.`
+    );
+  }
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
@@ -70,9 +131,9 @@ export function UploadPage() {
   return (
     <div className="max-w-lg mx-auto space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-gray-900">Upload Receipt</h2>
+        <h2 className="text-xl font-bold text-gray-900">Add a receipt</h2>
         <p className="text-sm text-gray-500 mt-1">
-          Take a photo or upload an image of your Costco receipt
+          Paste receipt text, import prices you saved, or photograph a paper receipt.
         </p>
       </div>
 
@@ -182,6 +243,74 @@ export function UploadPage() {
           </label>
         </div>
       )}
+
+      <form onSubmit={submitText} className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900">Paste a receipt</h3>
+          <p className="text-xs text-gray-500 mt-1">
+            Paste the receipt text, or a digital receipt email you saved. Nothing is sent to Costco.
+          </p>
+        </div>
+        <textarea
+          value={receiptText}
+          onChange={(event) => setReceiptText(event.target.value)}
+          rows={8}
+          placeholder={"WAREHOUSE #116\n11/01/2026\n1111111  KS OLIVE OIL           14.99"}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono"
+        />
+        <div className="flex gap-2">
+          <button
+            type="submit"
+            disabled={busy || !receiptText.trim()}
+            className="flex-1 bg-brand-600 text-white py-2.5 rounded-lg text-sm font-medium disabled:opacity-50"
+          >
+            Read receipt
+          </button>
+          <button
+            type="button"
+            onClick={useSampleReceipt}
+            disabled={busy}
+            className="px-3 py-2.5 rounded-lg text-sm font-medium border border-gray-300 text-gray-700"
+          >
+            Use sample
+          </button>
+        </div>
+      </form>
+
+      <form onSubmit={submitPrices} className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900">Current prices</h3>
+          <p className="text-xs text-gray-500 mt-1">
+            Paste a CSV or a public price page you saved. Columns: item_number, description, price, warehouse_id, observed_date.
+          </p>
+        </div>
+        <textarea
+          value={priceText}
+          onChange={(event) => setPriceText(event.target.value)}
+          rows={5}
+          placeholder="item_number,description,price,warehouse_id,observed_date"
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono"
+        />
+        <div className="flex gap-2">
+          <button
+            type="submit"
+            disabled={busy || !priceText.trim()}
+            className="flex-1 bg-gray-900 text-white py-2.5 rounded-lg text-sm font-medium disabled:opacity-50"
+          >
+            Import prices
+          </button>
+          <button
+            type="button"
+            onClick={useSamplePrices}
+            disabled={busy}
+            className="px-3 py-2.5 rounded-lg text-sm font-medium border border-gray-300 text-gray-700"
+          >
+            Use sample
+          </button>
+        </div>
+        {note && <p className="text-sm text-green-700">{note}</p>}
+        {error && <p className="text-sm text-red-600">{error}</p>}
+      </form>
 
       {/* Tips */}
       <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">

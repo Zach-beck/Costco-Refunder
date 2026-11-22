@@ -1,206 +1,96 @@
 # Costco Refunder
 
-Track Costco price drops and get your money back. Upload receipts, monitor prices within the 30-day adjustment window, and get step-by-step refund instructions when a price drops.
+Compare a Costco receipt with a later price. If the item is still inside the 30-day price adjustment window, the app shows the refund and how to ask for it at the membership counter or by calling 1-800-774-2678.
 
-## How It Works
+You supply the receipt and the prices. The app does not log into Costco, does not store a membership number, and does not send the claim for you.
 
-1. **Upload** — Photograph your Costco receipt. OCR + regex parsing extracts items automatically.
-2. **Track** — Items are monitored for 30 days (Costco's price adjustment window).
-3. **Alert** — When a price drops, you get notified with the exact savings amount.
-4. **Claim** — Follow step-by-step instructions to get your refund at the membership counter or by phone.
+## Quickstart
 
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────┐
-│                  React PWA (Vite)                     │
-│         Upload · Dashboard · Alerts · Guide          │
-└─────────────────────────┬───────────────────────────┘
-                          │
-                          ▼
-┌─────────────────────────────────────────────────────┐
-│                  Fastify API Server                   │
-│        Auth · Receipts · Prices · Dashboard          │
-└────┬────────────────────┬──────────────────┬────────┘
-     │                    │                  │
-     ▼                    ▼                  ▼
-┌──────────┐      ┌──────────────┐    ┌───────────┐
-│PostgreSQL│      │    Redis     │    │ S3 / R2   │
-│  (Neon)  │      │  (BullMQ)   │    │ (Images)  │
-└──────────┘      └──────┬───────┘    └───────────┘
-                         │
-                         ▼
-              ┌────────────────────┐
-              │   BullMQ Workers   │
-              │                    │
-              │ · Receipt Parser   │
-              │   (Tesseract+Regex)│
-              │ · Price Checker    │
-              │   (Cron: 6hr)      │
-              │ · Notifications    │
-              │   (Push + Email)   │
-              └────────────────────┘
-```
-
-## Tech Stack
-
-| Layer | Technology | Why |
-|-------|-----------|-----|
-| Frontend | React + TypeScript + Tailwind (PWA) | Cross-platform, push notifications, camera access |
-| Backend | Fastify + TypeScript | Fast, schema validation, shared types |
-| Database | PostgreSQL (Drizzle ORM) | Relational + JSONB |
-| Queue | BullMQ + Redis | Async receipt parsing, scheduled price checks |
-| OCR | Tesseract.js (self-hosted) | Free, no AI API costs |
-| Storage | S3-compatible (Cloudflare R2) | Zero egress costs |
-| Monorepo | Turborepo + Yarn Workspaces | Fast builds, shared packages |
-
-**Zero AI usage at runtime.** Receipt parsing uses Tesseract OCR + deterministic regex patterns. Price comparison is pure math. Eligibility checking is a rule engine. No LLM calls needed.
-
-## Project Structure
-
-```
-costco-price-tracker/
-├── packages/
-│   ├── shared/          # DB schema (Drizzle), types, constants
-│   ├── parser/          # Receipt OCR + regex parsing engine
-│   ├── api/             # Fastify server + BullMQ workers
-│   └── web/             # React PWA frontend
-├── docker-compose.yml   # Local dev: PostgreSQL, Redis, MinIO
-├── turbo.json           # Turborepo task config
-└── package.json         # Workspace root
-```
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js 20+
-- Yarn 1.x
-- Docker (for local databases)
-
-### Quick Setup (One Command)
+Requirements: Node.js 20+ and Yarn 1.x. Docker is optional and not used below.
 
 ```bash
-git clone https://github.com/Zach-beck/Costco-Refunder.git
-cd Costco-Refunder
-./scripts/setup.sh
-```
-
-This installs dependencies, starts PostgreSQL/Redis/MinIO via Docker, runs migrations, and seeds warehouse data.
-
-### Manual Setup
-
-```bash
-# Install dependencies
 yarn install
-
-# Start databases (PostgreSQL, Redis, MinIO)
-docker compose up -d
-
-# Copy environment config
-cp .env.example .env
-
-# Run database migrations
-yarn db:migrate
-
-# Seed warehouse data
-yarn db:seed
-
-# Start development servers (API + Web)
-yarn dev
+yarn test
+yarn refund -- --receipt fixtures/sample-receipt.txt --prices fixtures/public-prices.csv --as-of 2026-11-15
+yarn dev:local
 ```
 
-### Using the Makefile
+`yarn test` runs offline against fixtures. The refund command prints the claimable total for that sample (olive oil and paper towels, $7.00 on 2026-11-15).
+
+Then open http://localhost:5173.
+
+1. Create an account. The password is only for this app. It is stored as a hash in the local database under `data/`.
+2. Open Upload.
+3. Choose "Use sample" on the receipt form, then "Use sample" on the prices form.
+4. Open Price Alerts and a guide. The sample purchase is dated 10 days before today so the window is still open.
+
+Paste your own receipt text the same way. For prices, paste a CSV or a public product page you saved from your browser:
+
+```text
+item_number,description,price,warehouse_id,observed_date
+1111111,KS OLIVE OIL,11.49,116,2026-11-20
+```
+
+`observed_date` is when you saw the price. A warehouse id should match the receipt (`WAREHOUSE #116` in the sample). Prices from a different warehouse are ignored.
+
+A saved page can be an `<article data-item-number="1111111">` with a `$11.49` price, or a table row with the item number, name, and price.
+
+## What the check does
+
+1. Read item number, description, quantity, and price from receipt text or a saved email.
+2. Drop lines that are outside 30 days, clearance (price ends in .97), or an excluded category (fuel, pharmacy, tobacco, gift cards, special orders).
+3. Match a later price for the same item number and warehouse.
+4. Report `(paid - current) x quantity` and the deadline.
+
+Photo upload still runs Tesseract locally. The first photo can download language data, so the text path is the one that works offline.
+
+## Environment
+
+Copy `.env.example` to `.env` only if you want to override the defaults. `.env` is gitignored. Do not commit it.
+
+Local mode uses:
+
+| Name | Purpose |
+| --- | --- |
+| `LOCAL_MODE` | `1` embeds the database and skips Redis and object storage |
+| `DATA_DIR` | Where the local database and photos live. Default `./data` |
+| `SESSION_SECRET` | Signs cookies. Change this if anyone else can reach the server |
+| `PORT` | API port, default `3001` |
+| `WEB_URL` | Web origin, default `http://localhost:5173` |
+
+These names are optional and unused by the local quickstart. Set them only in `.env`:
+
+`DATABASE_URL`, `REDIS_URL`, `S3_ENDPOINT`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET`, `S3_REGION`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `VITE_VAPID_PUBLIC_KEY`, `RESEND_API_KEY`, `FROM_EMAIL`, `API_URL`, `NODE_ENV`, `COOKIE_DOMAIN`.
+
+The MinIO values in the example are the stock local defaults. Do not reuse them on a shared machine.
+
+## Optional Docker stack
+
+`docker compose up -d` starts Postgres, Redis, and MinIO. Then set `LOCAL_MODE=0` in `.env` and run `yarn db:migrate`, `yarn db:seed`, and `yarn dev`. That path was the original design. The quickstart above does not need it.
+
+`make local` is the same as `yarn dev:local`. `make dev` still starts Docker.
+
+## Layout
+
+```text
+packages/shared    schema, warehouse list, shared types
+packages/parser    receipt parsing, price files, refund math, tests
+packages/api       Fastify API. Local mode or Postgres
+packages/web       React app
+fixtures           fake receipt, email, CSV, and saved price page
+docs/decisions-review.md
+```
+
+## Tests
 
 ```bash
-make setup     # Full one-command setup
-make dev       # Start infra + app
-make stop      # Stop Docker containers
-make test      # Run all tests
-make typecheck # TypeScript checking
-make db-reset  # Drop and recreate database
+yarn test
 ```
 
-The web app runs at `http://localhost:5173` and the API at `http://localhost:3001`.
+Parser tests cover receipt lines, eligibility, the sample fixtures, CSV, a saved HTML price page, and a digital receipt email. They do not call Costco and they do not use a real account.
 
-### Environment Variables
+## Notes
 
-See `.env.example` for all configurable values. Required for local dev:
-- `DATABASE_URL` — PostgreSQL connection string
-- `REDIS_URL` — Redis connection string
-- `S3_ENDPOINT` — MinIO/R2 endpoint
+Policy details can change. Confirm the adjustment at the warehouse before you count on a refund.
 
-Optional (for notifications):
-- `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` — Generate with `npx web-push generate-vapid-keys`
-- `RESEND_API_KEY` — For email notifications
-
-## Key Design Decisions
-
-### Why no AI/LLM?
-
-Costco receipts are thermal-printed monospace text with a highly consistent format. Deterministic regex parsing achieves 95%+ accuracy on item numbers and 98%+ on prices. This eliminates per-receipt API costs (~$0.01-0.05 each with Vision APIs) — at scale, that saves thousands per month.
-
-### Price Tracking Strategy
-
-Since Costco has no public price API:
-1. **Crowdsourced** — Every receipt upload feeds the shared price database
-2. **Manual entry** — "I spotted a lower price" button
-3. **Rule-based intelligence** — Price ending .97 = clearance, .00/.88 = manufacturer deal
-4. **No scraping** — Relies entirely on user-submitted data (legal, sustainable)
-
-### Price Adjustment Policy (as of knowledge cutoff)
-
-- **Window:** 30 days from purchase
-- **Method:** Membership counter in-store OR call 1-800-774-2678
-- **Exclusions:** Clearance (.97), fuel, pharmacy, tobacco, gift cards, special orders
-- **Proof:** Membership card lookup (no receipt required)
-
-## Development Commands
-
-```bash
-yarn dev              # Start all services in dev mode
-yarn build            # Build all packages
-yarn typecheck        # TypeScript type checking
-yarn test             # Run tests
-yarn db:generate      # Generate Drizzle migrations
-yarn db:migrate       # Apply migrations
-yarn db:seed          # Seed warehouse data
-yarn clean            # Remove build artifacts
-```
-
-## Deployment
-
-### Recommended Stack (Low Cost)
-
-| Service | Provider | Cost |
-|---------|----------|------|
-| API + Workers | Railway | $5-20/mo |
-| Frontend | Cloudflare Pages | Free |
-| Database | Neon PostgreSQL | Free-$19/mo |
-| Redis | Upstash | Free-$5/mo |
-| Object Storage | Cloudflare R2 | ~$0 (free tier) |
-| **Total** | | **$5-44/month** |
-
-### Production Deployment
-
-1. Push to GitHub (CI/CD triggers on push to main)
-2. Frontend deploys automatically to Cloudflare Pages
-3. Backend builds Docker image and deploys to Railway
-4. Database migrations run as part of deploy pipeline
-
-## Roadmap
-
-- [x] Receipt upload + OCR parsing
-- [x] Price tracking with crowdsourced data
-- [x] Push + email notifications
-- [x] Reimbursement step-by-step guide
-- [ ] Digital receipt email forwarding (parse HTML, no OCR needed)
-- [ ] Multi-warehouse price comparison
-- [ ] Price history charts
-- [ ] Barcode scanning for in-store price checks
-- [ ] Predictive alerts ("this item usually goes on sale in X month")
-- [ ] Household/family sharing
-
-## License
-
-MIT
+See `docs/decisions-review.md` for which earlier choices held up, which were risky, and what this version changed.

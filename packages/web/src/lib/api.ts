@@ -19,10 +19,16 @@ async function request<T>(
     headers["x-csrf-token"] = csrfToken;
   }
 
+  const method = (options?.method || "GET").toUpperCase();
+  const body =
+    options?.body ??
+    (method === "GET" || method === "HEAD" ? undefined : "{}");
+
   const res = await fetch(`${API_BASE}${path}`, {
     credentials: "include",
     headers,
     ...options,
+    body,
   });
 
   let json: any;
@@ -57,12 +63,49 @@ export const api = {
     }),
 
   uploadImage: async (uploadUrl: string, file: File) => {
-    await fetch(uploadUrl, {
+    const headers: Record<string, string> = {
+      "Content-Type": file.type || "application/octet-stream",
+    };
+    const sameOrigin =
+      uploadUrl.startsWith("/") || uploadUrl.startsWith(window.location.origin);
+    if (sameOrigin) {
+      const csrfToken = getCsrfToken();
+      if (csrfToken) headers["x-csrf-token"] = csrfToken;
+    }
+    const res = await fetch(uploadUrl, {
       method: "PUT",
       body: file,
-      headers: { "Content-Type": file.type },
+      headers,
+      credentials: sameOrigin ? "include" : "omit",
     });
+    if (!res.ok) {
+      throw new Error("Upload failed");
+    }
   },
+
+  submitReceiptText: (data: { text: string; warehouseId?: number; receiptDate?: string }) =>
+    request<{ receiptId: string; itemCount: number; alertsCreated: number }>("/receipts/text", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  loadSampleReceipt: () =>
+    request<{ receiptId: string; itemCount: number; alertsCreated: number }>("/receipts/sample", {
+      method: "POST",
+      body: JSON.stringify({}),
+    }),
+
+  importPrices: (data: { format?: "csv" | "html"; content: string; warehouseId?: number; observedDate?: string }) =>
+    request<{ imported: number; alertsCreated: number }>("/prices/import", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  loadSamplePrices: () =>
+    request<{ imported: number; alertsCreated: number }>("/prices/sample", {
+      method: "POST",
+      body: JSON.stringify({}),
+    }),
 
   createReceipt: (data: { imageKey: string; receiptDate?: string; warehouseId?: number }) =>
     request<any>("/receipts", { method: "POST", body: JSON.stringify(data) }),

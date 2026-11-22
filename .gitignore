@@ -32,5 +32,6 @@ docker-data/
 # Build info
 *.tsbuildinfo
 
-# Uploaded files (local dev)
+# Uploaded files and embedded local database
 uploads/
+data/

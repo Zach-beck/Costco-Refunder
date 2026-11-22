@@ -10,7 +10,7 @@ const STEPS = [
     icon: <Upload className="text-brand-600" size={32} />,
     title: "Upload your receipts",
     description:
-      "Take a photo of your Costco receipt. Our OCR system will automatically extract all items and prices.",
+      "Paste receipt text or a saved email. A photo is optional. Items and prices are read on this machine.",
   },
   {
     icon: <Clock className="text-amber-600" size={32} />,
@@ -22,7 +22,7 @@ const STEPS = [
     icon: <Bell className="text-purple-600" size={32} />,
     title: "Get notified of price drops",
     description:
-      "When other users report lower prices, or you spot one yourself, we'll alert you immediately.",
+      "Import a price file you saved, or type a price you saw. If it is lower, you get an alert with the refund.",
   },
   {
     icon: <DollarSign className="text-green-600" size={32} />,

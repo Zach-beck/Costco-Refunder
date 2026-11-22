@@ -14,6 +14,10 @@ export {
   checkItemEligibility,
 } from "./receipt-parser.js";
 export { parseEmailReceipt } from "./email-parser.js";
+export { parsePriceCatalogCsv, parsePublicPriceHtml } from "./prices.js";
+export { evaluateRefunds, formatRefundReport, parseReceiptText } from "./refund.js";
+export { redactReceiptText } from "./redact.js";
+export { addDaysIso } from "./dates.js";
 
 /**
  * Full receipt parsing pipeline: preprocess → OCR → parse.

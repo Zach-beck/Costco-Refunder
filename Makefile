@@ -1,13 +1,21 @@
-.PHONY: setup dev stop test clean
+.PHONY: setup dev local stop test refund clean
 
 # One-command full setup
 setup:
 	./scripts/setup.sh
 
-# Start everything (infrastructure + app)
+# Start everything (infrastructure + app). Needs Docker.
 dev:
 	docker compose up -d
 	yarn dev
+
+# Local app: embedded database, no Docker, no Costco login
+local:
+	yarn dev:local
+
+# Compare a receipt file to a price file
+refund:
+	yarn refund -- --receipt fixtures/sample-receipt.txt --prices fixtures/public-prices.csv --as-of 2026-11-15
 
 # Stop infrastructure
 stop:

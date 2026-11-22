@@ -127,7 +127,7 @@ export const priceObservations = pgTable(
     price: decimal("price", { precision: 10, scale: 2 }).notNull(),
     observedDate: date("observed_date").notNull(),
     source: text("source")
-      .$type<"receipt_upload" | "manual_entry" | "web_scrape">()
+      .$type<"receipt_upload" | "manual_entry" | "public_page" | "catalog_import">()
       .notNull(),
     reportedBy: uuid("reported_by").references(() => users.id),
     verified: boolean("verified").default(false),

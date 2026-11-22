@@ -1,14 +1,8 @@
 import { Queue } from "bullmq";
 import { redis } from "../lib/redis.js";
 
-export const receiptQueue = new Queue("receipt-processing", {
-  connection: redis,
-});
+const connection = redis as never;
 
-export const priceCheckQueue = new Queue("price-checking", {
-  connection: redis,
-});
-
-export const notificationQueue = new Queue("notifications", {
-  connection: redis,
-});
+export const receiptQueue = new Queue("receipt-processing", { connection });
+export const priceCheckQueue = new Queue("price-checking", { connection });
+export const notificationQueue = new Queue("notifications", { connection });
