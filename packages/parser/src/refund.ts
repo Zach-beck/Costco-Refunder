@@ -123,6 +123,7 @@ export function formatRefundReport(evaluation: RefundEvaluation): string {
   const claimable = results.filter((line) => line.eligible && line.totalSavings > 0);
   if (claimable.length === 0) {
     lines.push("No price match found in this comparison.");
+    lines.push("");
   } else {
     lines.push(`Possible price match: $${totalRefund.toFixed(2)}. Costco decides every claim.`);
     if (caveatTotal > 0) {

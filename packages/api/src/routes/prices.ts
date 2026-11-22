@@ -333,7 +333,7 @@ export async function priceRoutes(app: FastifyInstance) {
           },
           {
             stepNumber: 4,
-            title: "Expected refund",
+            title: "Possible price match",
             description: `$${result.alert.originalPrice} - $${result.alert.newPrice} = $${result.alert.savings} per unit × ${quantity} = $${savings.toFixed(2)} possible price match. Costco decides every claim.`,
             actionType: "info",
           },
