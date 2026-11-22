@@ -4,8 +4,17 @@ import type { OcrLine } from "./ocr.js";
 // ─── Regex patterns for Costco receipt format ────────────────────────────────
 
 // Item line: "123456  ITEM DESCRIPTION     12.99 A"
+// Also accepts single-spaced lines, 4-digit item numbers, Y/N/B tax flags and
+// inline quantities: "7000001 SAMPLE ITEM 2 @ 3.99 = 7.98 Y"
 const ITEM_LINE_PATTERN =
-  /^(\d{5,7})\s+(.+?)\s{2,}(\d{1,4}\.\d{2})\s*([A-Z]?)$/;
+  /^(\d{4,7})\s+(.+?)\s+(?:(\d+)\s*@\s*(\d{1,4}\.\d{2})\s*=\s*)?(\d{1,4}\.\d{2})(?:\s+([A-Z]))?$/;
+
+// California redemption value (bottle deposit): "9001 CA REDEMP VAL T EE/7000002 1.20"
+const CRV_PATTERN = /^\d{3,7}\s+CA\s+REDEMP\b.*?\/\s*(\d{4,7})\s+(\d{1,4}\.\d{2})$/i;
+
+// Instant savings tied to an item: "900001 /7000003 10.00- (instant savings)"
+const LINKED_DISCOUNT_PATTERN =
+  /^(\d{4,7})\s*\/\s*(\d{4,7})\s+(\d{1,4}\.\d{2})-(?:\s*\(.*\))?$/;
 
 // Quantity line (appears before item): "2 @ 5.99"
 const QUANTITY_PATTERN = /^(\d+)\s*[@xX]\s*(\d{1,4}\.\d{2})$/;
@@ -18,19 +27,22 @@ const DISCOUNT_PATTERN =
 const SUBTOTAL_PATTERN = /(?:SUBTOTAL|SUB\s*TOTAL)\s+(\d{1,5}\.\d{2})/i;
 
 // Tax line
-const TAX_PATTERN = /(?:TAX)\s+(\d{1,4}\.\d{2})/i;
+const TAX_PATTERN = /^TAX\s+(\d{1,4}\.\d{2})/i;
 
 // Total line
 const TOTAL_PATTERN =
   /(?:\*{2,}\s*TOTAL|\bTOTAL\b)\s+(\d{1,5}\.\d{2})/i;
 
 // Warehouse info from header
-const WAREHOUSE_PATTERN = /(?:WAREHOUSE|WH)\s*#?\s*(\d{1,4})/i;
+const WAREHOUSE_PATTERN = /(?:WAREHOUSE|WH)\s*#?\s*(\d{1,4})\b/i;
+// Store line on member receipts: "SAMPLETOWN #123" or "... | SAMPLETOWN #987, 1 MAIN ST"
+const STORE_NUMBER_PATTERN = /\b[A-Z][A-Z .'-]*\s#(\d{1,4})\b/i;
 const WAREHOUSE_CITY_PATTERN =
   /^([A-Z][A-Za-z\s]+),\s*([A-Z]{2})\s+(\d{5})/;
 
 // Date patterns
-const DATE_PATTERN_MDY = /(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/;
+const DATE_PATTERN_ISO = /\b(\d{4})-(\d{2})-(\d{2})\b/;
+const DATE_PATTERN_MDY = /\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4}|\d{2})\b/;
 
 // Member number
 const MEMBER_PATTERN = /(?:MEMBER|MBR)\s*#?\s*(\d[\d\s*]{8,})/i;
@@ -47,6 +59,7 @@ export function parseReceiptLines(lines: OcrLine[]): ParsedReceipt {
   let tax: number | null = null;
   let total: number | null = null;
 
+  let depositTotal = 0;
   let pendingQuantity: { qty: number; unitPrice: number } | null = null;
 
   for (let i = 0; i < lines.length; i++) {
@@ -55,7 +68,8 @@ export function parseReceiptLines(lines: OcrLine[]): ParsedReceipt {
 
     // Try to extract warehouse ID
     if (!warehouseId) {
-      const whMatch = text.match(WAREHOUSE_PATTERN);
+      const whMatch =
+        text.match(WAREHOUSE_PATTERN) ?? text.match(STORE_NUMBER_PATTERN);
       if (whMatch) {
         warehouseId = parseInt(whMatch[1], 10);
       }
@@ -70,6 +84,10 @@ export function parseReceiptLines(lines: OcrLine[]): ParsedReceipt {
     }
 
     // Try to extract date
+    if (!receiptDate) {
+      const iso = text.match(DATE_PATTERN_ISO);
+      if (iso) receiptDate = `${iso[1]}-${iso[2]}-${iso[3]}`;
+    }
     if (!receiptDate) {
       const dateMatch = text.match(DATE_PATTERN_MDY);
       if (dateMatch) {
@@ -101,19 +119,41 @@ export function parseReceiptLines(lines: OcrLine[]): ParsedReceipt {
       continue;
     }
 
+    // Bottle deposits are not part of the item price; keep them for subtotal checks
+    const crvMatch = text.match(CRV_PATTERN);
+    if (crvMatch) {
+      depositTotal += parseFloat(crvMatch[2]);
+      continue;
+    }
+
+    // Instant savings that name the item they apply to
+    const linked = text.match(LINKED_DISCOUNT_PATTERN);
+    if (linked && items.length > 0) {
+      const target =
+        [...items].reverse().find((it) => it.itemNumber === parseInt(linked[2], 10)) ??
+        items[items.length - 1];
+      target.totalPrice = Math.round((target.totalPrice - parseFloat(linked[3])) * 100) / 100;
+      target.unitPrice = target.totalPrice / target.quantity;
+      continue;
+    }
+
     // Check for item line
     const itemMatch = text.match(ITEM_LINE_PATTERN);
     if (itemMatch) {
       const itemNumber = parseInt(itemMatch[1], 10);
       const description = itemMatch[2].trim();
-      const price = parseFloat(itemMatch[3]);
-      const taxIndicator = itemMatch[4];
+      const price = parseFloat(itemMatch[5]);
+      const taxIndicator = itemMatch[6] ?? "";
 
       let quantity = 1;
       let unitPrice = price;
       let totalPrice = price;
 
-      if (pendingQuantity) {
+      if (itemMatch[3]) {
+        quantity = parseInt(itemMatch[3], 10);
+        unitPrice = parseFloat(itemMatch[4]);
+        pendingQuantity = null;
+      } else if (pendingQuantity) {
         quantity = pendingQuantity.qty;
         unitPrice = pendingQuantity.unitPrice;
         totalPrice = price;
@@ -126,7 +166,8 @@ export function parseReceiptLines(lines: OcrLine[]): ParsedReceipt {
         quantity,
         unitPrice,
         totalPrice,
-        isTaxable: taxIndicator === "A",
+        shelfPrice: unitPrice,
+        isTaxable: taxIndicator !== "" && taxIndicator !== "N",
         confidence: line.confidence,
       });
       continue;
@@ -164,7 +205,7 @@ export function parseReceiptLines(lines: OcrLine[]): ParsedReceipt {
     pendingQuantity = null;
   }
 
-  const overallConfidence = calculateOverallConfidence(items, subtotal);
+  const overallConfidence = calculateOverallConfidence(items, subtotal, depositTotal);
 
   return {
     warehouseId,
@@ -191,7 +232,8 @@ function cleanOcrText(text: string): string {
 
 function calculateOverallConfidence(
   items: ParsedReceiptItem[],
-  subtotal: number | null
+  subtotal: number | null,
+  depositTotal = 0
 ): number {
   if (items.length === 0) return 0;
 
@@ -204,7 +246,7 @@ function calculateOverallConfidence(
   if (subtotal !== null) {
     const calculatedSubtotal = items.reduce(
       (sum, item) => sum + item.totalPrice,
-      0
+      depositTotal
     );
     const diff = Math.abs(calculatedSubtotal - subtotal);
     if (diff < 0.02) {

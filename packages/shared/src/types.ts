@@ -25,6 +25,8 @@ export interface ParsedReceiptItem {
   quantity: number;
   unitPrice: number;
   totalPrice: number;
+  /** Unit price printed on the item line, before any instant savings or coupon. */
+  shelfPrice?: number;
   isTaxable: boolean;
   confidence: number;
 }
