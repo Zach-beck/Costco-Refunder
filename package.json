@@ -1,7 +1,8 @@
 {
-  "name": "costco-refunder",
+  "name": "receipt-rewind",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "workspaces": [
     "packages/*"
   ],
@@ -13,9 +14,9 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
-    "db:generate": "turbo run db:generate --filter=@costco-refunder/shared",
-    "db:migrate": "turbo run db:migrate --filter=@costco-refunder/shared",
-    "db:seed": "turbo run db:seed --filter=@costco-refunder/shared",
+    "db:generate": "turbo run db:generate --filter=@receipt-rewind/shared",
+    "db:migrate": "turbo run db:migrate --filter=@receipt-rewind/shared",
+    "db:seed": "turbo run db:seed --filter=@receipt-rewind/shared",
     "clean": "turbo run clean"
   },
   "devDependencies": {

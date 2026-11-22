@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, MapPin, Phone, Globe, Info } from "lucide-react";
 import { api } from "../lib/api";
-import type { ReimbursementGuide } from "@costco-refunder/shared";
+import type { ReimbursementGuide } from "@receipt-rewind/shared";
 
 export function GuidePage() {
   const { id } = useParams<{ id: string }>();

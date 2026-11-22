@@ -10,9 +10,9 @@ export default defineConfig({
       registerType: "autoUpdate",
       includeAssets: ["favicon.svg", "favicon.ico"],
       manifest: {
-        name: "Costco Refunder",
-        short_name: "Refunder",
-        description: "Track Costco price drops and get your money back",
+        name: "Receipt Rewind",
+        short_name: "Rewind",
+        description: "A local price-drop checker. Works with Costco receipts. Not affiliated with Costco.",
         theme_color: "#2563eb",
         background_color: "#ffffff",
         display: "standalone",
@@ -40,7 +40,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       "/api": {
-        target: "http://localhost:3001",
+        target: "http://127.0.0.1:3001",
         changeOrigin: true,
       },
     },

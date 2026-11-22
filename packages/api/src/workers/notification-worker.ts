@@ -7,7 +7,7 @@ import {
   users,
   pushSubscriptions,
   warehouses,
-} from "@costco-refunder/shared";
+} from "@receipt-rewind/shared";
 import { redis } from "../lib/redis.js";
 import { db } from "../lib/db.js";
 
@@ -19,7 +19,7 @@ try {
   webpush = await import("web-push");
   if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
     webpush.setVapidDetails(
-      process.env.VAPID_SUBJECT || "mailto:admin@costco-refunder.app",
+      process.env.VAPID_SUBJECT || "mailto:admin@example.com",
       process.env.VAPID_PUBLIC_KEY,
       process.env.VAPID_PRIVATE_KEY
     );
@@ -103,7 +103,7 @@ export const notificationWorker = new Worker<NotificationJob>(
     if (prefs.email && resend && user.email) {
       try {
         await resend.emails.send({
-          from: process.env.FROM_EMAIL || "alerts@costco-refunder.app",
+          from: process.env.FROM_EMAIL || "alerts@example.com",
           to: user.email,
           subject: title,
           html: buildEmailHtml({
@@ -168,7 +168,7 @@ function buildEmailHtml(data: {
       </div>
       <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
       <p style="color: #6b7280; font-size: 12px;">
-        You're receiving this because you uploaded a receipt with this item to Costco Refunder.
+        You're receiving this because you uploaded a receipt with this item to Receipt Rewind.
         <a href="${webUrl}/settings">Manage notification preferences</a>
       </p>
     </div>

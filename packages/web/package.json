@@ -1,5 +1,5 @@
 {
-  "name": "@costco-refunder/web",
+  "name": "@receipt-rewind/web",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -11,7 +11,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@costco-refunder/shared": "*",
+    "@receipt-rewind/shared": "*",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
     "react-router-dom": "^6.26.0",

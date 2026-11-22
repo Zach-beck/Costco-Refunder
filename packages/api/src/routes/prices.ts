@@ -8,10 +8,10 @@ import {
   items,
   warehouses,
   ManualPriceEntrySchema,
-} from "@costco-refunder/shared";
+} from "@receipt-rewind/shared";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { parsePriceCatalogCsv, parsePublicPriceHtml } from "@costco-refunder/parser/text";
+import { parsePriceCatalogCsv, parsePublicPriceHtml } from "@receipt-rewind/parser/text";
 import { db } from "../lib/db.js";
 import { requireAuth } from "../lib/auth.js";
 import { checkForAlerts, ensureWarehouse } from "../lib/alerts.js";
@@ -41,10 +41,21 @@ async function importPriceContent(
 
   let imported = 0;
   let alertsCreated = 0;
+  let skipped = 0;
 
   for (const price of catalog) {
+    // Alerts here are for warehouse receipts. Online prices (a saved costco.com
+    // page) and per-pound prices never count against a warehouse purchase.
+    if (price.channel === "online" || price.unit === "lb") {
+      skipped++;
+      continue;
+    }
+    // A warehouse price needs its own warehouse number. A blank never matches.
     const warehouseId = price.warehouseId ?? input.warehouseId ?? null;
-    if (!warehouseId) continue;
+    if (!warehouseId) {
+      skipped++;
+      continue;
+    }
     const observedDate = price.observedDate || defaults.observedDate || today;
     await ensureWarehouse(warehouseId);
     await db
@@ -70,7 +81,7 @@ async function importPriceContent(
     alertsCreated += await checkForAlerts(price.itemNumber, warehouseId, price.price);
   }
 
-  return { imported, alertsCreated };
+  return { imported, alertsCreated, skipped };
 }
 
 export async function priceRoutes(app: FastifyInstance) {
@@ -310,26 +321,26 @@ export async function priceRoutes(app: FastifyInstance) {
           },
           {
             stepNumber: 2,
-            title: "Visit the Membership Counter",
-            description: `Go to ${result.warehouse?.name ?? "your Costco warehouse"} and visit the membership counter. Bring your membership card. Costco can look the purchase up from the card. This app does not contact Costco.`,
+            title: "Visit the Returns counter",
+            description: `Go to the Returns counter at ${result.warehouse?.name ?? "the Costco warehouse"} (#${result.receipt.warehouseId}), where you bought it. Bring your membership card. Costco can look the purchase up from the card. This app does not contact Costco.`,
             actionType: "visit",
           },
           {
             stepNumber: 3,
-            title: "Or call Costco",
-            description: `Call 1-800-774-2678. Reference item #${result.item.itemId}, purchased on ${result.receipt.receiptDate}. Request a price adjustment to the current price of $${result.alert.newPrice}.`,
-            actionType: "call",
+            title: "Costco decides",
+            description: `Ask for a price match on item #${result.item.itemId}, purchased on ${asDateString(result.receipt.receiptDate)}, to the current price of $${result.alert.newPrice}. Costco decides every request. Costco.com orders use the Request a Price Match form on Costco's help site instead.`,
+            actionType: "info",
           },
           {
             stepNumber: 4,
-            title: "Expected refund",
-            description: `$${result.alert.originalPrice} - $${result.alert.newPrice} = $${result.alert.savings} per unit × ${quantity} = $${savings.toFixed(2)} total refund to your original payment method.`,
+            title: "Possible price match",
+            description: `$${result.alert.originalPrice} - $${result.alert.newPrice} = $${result.alert.savings} per unit × ${quantity} = $${savings.toFixed(2)} possible price match. Costco decides every claim.`,
             actionType: "info",
           },
           {
             stepNumber: 5,
             title: "Deadline",
-            description: `You must request this adjustment by ${asDateString(result.alert.eligibleUntil)} (${daysRemaining} days remaining). Claiming a couple of days before the deadline leaves room if the counter is busy.`,
+            description: `Ask by ${asDateString(result.alert.eligibleUntil)} (${daysRemaining} days remaining). Claiming a couple of days before the deadline leaves room if the counter is busy.`,
             actionType: "info",
           },
         ],

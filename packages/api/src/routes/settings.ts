@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { eq } from "drizzle-orm";
-import { users, pushSubscriptions, NotificationPrefsSchema } from "@costco-refunder/shared";
+import { users, pushSubscriptions, NotificationPrefsSchema } from "@receipt-rewind/shared";
 import { db } from "../lib/db.js";
 import { redis } from "../lib/redis.js";
 import { requireAuth, hashPassword, verifyPassword } from "../lib/auth.js";
@@ -176,9 +176,9 @@ export async function settingsRoutes(app: FastifyInstance) {
         const { Resend } = await import("resend");
         const resend = new Resend(process.env.RESEND_API_KEY);
         await resend.emails.send({
-          from: process.env.FROM_EMAIL || "noreply@costco-refunder.app",
+          from: process.env.FROM_EMAIL || "noreply@example.com",
           to: email,
-          subject: "Reset your Costco Refunder password",
+          subject: "Reset your Receipt Rewind password",
           html: `<p>Click the link below to reset your password. It expires in 1 hour.</p><p><a href="${resetUrl}">Reset Password</a></p>`,
         });
       } catch (err) {

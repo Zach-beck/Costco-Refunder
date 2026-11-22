@@ -9,7 +9,7 @@ import {
   items,
   priceObservations,
   ADJUSTMENT_WINDOW_DAYS,
-} from "@costco-refunder/shared";
+} from "@receipt-rewind/shared";
 import { db } from "../lib/db.js";
 import { getUploadUrl, getDownloadUrl, putObject, readLocalObject } from "../lib/s3.js";
 import { requireAuth } from "../lib/auth.js";

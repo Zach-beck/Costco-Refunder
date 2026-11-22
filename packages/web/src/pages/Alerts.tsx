@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Bell, DollarSign, Clock, CheckCircle2, X } from "lucide-react";
 import { api } from "../lib/api";
-import type { PriceAlert } from "@costco-refunder/shared";
+import type { PriceAlert } from "@receipt-rewind/shared";
 
 export function AlertsPage() {
   const [alerts, setAlerts] = useState<PriceAlert[]>([]);
@@ -89,6 +89,7 @@ export function AlertsPage() {
                   <span className="text-sm font-bold">
                     {alert.savings.toFixed(2)}
                   </span>
+                  <span className="text-[10px] text-gray-500">Costco decides</span>
                 </div>
               </div>
 

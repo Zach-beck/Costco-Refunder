@@ -19,7 +19,7 @@ export function Layout() {
           <div className="h-8 w-8 rounded-lg bg-brand-600 flex items-center justify-center">
             <span className="text-white font-bold text-sm">CR</span>
           </div>
-          <h1 className="text-lg font-semibold text-gray-900">Costco Refunder</h1>
+          <h1 className="text-lg font-semibold text-gray-900">Receipt Rewind</h1>
         </div>
         <div className="flex items-center gap-3">
           <span className="text-sm text-gray-500">{user?.email}</span>
@@ -47,6 +47,10 @@ export function Layout() {
         {/* Page content */}
         <main className="flex-1 p-4 pb-20 md:p-6 md:pb-6 overflow-auto">
           <Outlet />
+          <p className="mt-8 text-[11px] text-gray-400">
+            Receipt Rewind is an independent project, not affiliated with or endorsed by Costco
+            Wholesale. Costco decides every price match.
+          </p>
         </main>
       </div>
 

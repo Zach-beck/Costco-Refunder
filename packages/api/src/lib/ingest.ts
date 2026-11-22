@@ -5,14 +5,14 @@ import {
   priceObservations,
   receiptItems,
   receipts,
-} from "@costco-refunder/shared";
+} from "@receipt-rewind/shared";
 import {
   addDaysIso,
   checkItemEligibility,
   parseReceiptText,
   redactReceiptText,
-} from "@costco-refunder/parser/text";
-import type { ParsedReceipt } from "@costco-refunder/shared";
+} from "@receipt-rewind/parser/text";
+import type { ParsedReceipt } from "@receipt-rewind/shared";
 import { refreshAlertsForItem, ensureWarehouse } from "./alerts.js";
 import { db } from "./db.js";
 

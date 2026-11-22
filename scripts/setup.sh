@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-echo "=== Costco Refunder setup ==="
+echo "=== Receipt Rewind setup ==="
 echo ""
 
 # Check prerequisites

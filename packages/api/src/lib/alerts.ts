@@ -6,7 +6,7 @@ import {
   receiptItems,
   receipts,
   warehouses,
-} from "@costco-refunder/shared";
+} from "@receipt-rewind/shared";
 import { daysAgoIso } from "./dates.js";
 import { db } from "./db.js";
 

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useStore } from "../lib/store";
 import { api } from "../lib/api";
 import { Save, Download, Bell, BellOff } from "lucide-react";
+import { POLICY_SOURCE } from "@receipt-rewind/shared/types";
 
 export function SettingsPage() {
   const { user, checkAuth } = useStore();
@@ -289,19 +290,25 @@ export function SettingsPage() {
 
       {/* Info */}
       <div className="bg-white rounded-xl border border-gray-200 p-4">
-        <h3 className="text-sm font-medium text-gray-900 mb-2">About Costco Price Adjustments</h3>
+        <h3 className="text-sm font-medium text-gray-900 mb-2">About Costco's price match policy</h3>
         <div className="text-xs text-gray-600 space-y-2">
           <p>
-            Costco offers a price adjustment policy: if an item you purchased drops in price
-            within 30 days, you can request a refund for the difference.
+            Costco's US price match page lists 30 days from purchase for Costco.com orders. This app
+            assumes 30 days for warehouse purchases too. Costco decides every request.
           </p>
           <p>
-            <strong>How to claim:</strong> Visit the Membership Counter at your Costco warehouse
-            with your membership card, or call 1-800-774-2678.
+            <strong>How to ask:</strong> warehouse purchases at the Returns counter of the warehouse
+            where you bought the item. Costco.com orders through the Request a Price Match form on
+            Costco's help site. Online and warehouse prices don't cross-match.
           </p>
           <p>
-            <strong>Exclusions:</strong> Clearance items (price ending .97), fuel, pharmacy,
-            tobacco, gift cards, and special orders are typically not eligible.
+            <strong>Unofficial hints:</strong> prices ending in .97, fuel, pharmacy, tobacco, gift
+            cards, and special orders are often reported as not adjustable. Costco's page doesn't
+            list them, so the app shows a note instead of dropping the item.
+          </p>
+          <p>
+            Policy source: {POLICY_SOURCE.page}, version {POLICY_SOURCE.version}, last checked{" "}
+            {POLICY_SOURCE.lastChecked}.
           </p>
         </div>
       </div>

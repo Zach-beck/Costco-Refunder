@@ -2,7 +2,7 @@ import { hash, verify } from "argon2";
 import { nanoid } from "nanoid";
 import { eq } from "drizzle-orm";
 import { db } from "./db.js";
-import { users, sessions } from "@costco-refunder/shared";
+import { users, sessions } from "@receipt-rewind/shared";
 import type { FastifyRequest, FastifyReply } from "fastify";
 
 const SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000; // 30 days

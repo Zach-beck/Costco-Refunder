@@ -96,13 +96,13 @@ export const api = {
     }),
 
   importPrices: (data: { format?: "csv" | "html"; content: string; warehouseId?: number; observedDate?: string }) =>
-    request<{ imported: number; alertsCreated: number }>("/prices/import", {
+    request<{ imported: number; alertsCreated: number; skipped?: number }>("/prices/import", {
       method: "POST",
       body: JSON.stringify(data),
     }),
 
   loadSamplePrices: () =>
-    request<{ imported: number; alertsCreated: number }>("/prices/sample", {
+    request<{ imported: number; alertsCreated: number; skipped?: number }>("/prices/sample", {
       method: "POST",
       body: JSON.stringify({}),
     }),

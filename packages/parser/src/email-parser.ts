@@ -1,4 +1,4 @@
-import type { ParsedReceipt, ParsedReceiptItem } from "@costco-refunder/shared";
+import type { ParsedReceipt, ParsedReceiptItem } from "@receipt-rewind/shared";
 
 /**
  * Parse a Costco digital receipt email body (plain text or HTML).

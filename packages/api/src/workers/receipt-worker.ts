@@ -1,6 +1,6 @@
 import { Worker } from "bullmq";
 import { eq } from "drizzle-orm";
-import { receipts } from "@costco-refunder/shared";
+import { receipts } from "@receipt-rewind/shared";
 import { redis } from "../lib/redis.js";
 import { db } from "../lib/db.js";
 import { processReceiptImageJob } from "../lib/process-image.js";

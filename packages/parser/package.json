@@ -1,5 +1,5 @@
 {
-  "name": "@costco-refunder/parser",
+  "name": "@receipt-rewind/parser",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -18,7 +18,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@costco-refunder/shared": "*",
+    "@receipt-rewind/shared": "*",
     "tesseract.js": "^5.1.0",
     "sharp": "^0.33.0"
   },

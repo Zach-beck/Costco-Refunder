@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { eq } from "drizzle-orm";
-import { users, SignupSchema, LoginSchema } from "@costco-refunder/shared";
+import { users, SignupSchema, LoginSchema } from "@receipt-rewind/shared";
 import { db } from "../lib/db.js";
 import {
   hashPassword,

@@ -54,7 +54,7 @@ export function UploadPage() {
       return;
     }
     setNote(
-      `Imported ${res.data.imported} prices. ${res.data.alertsCreated} new alert${res.data.alertsCreated === 1 ? "" : "s"}.`
+      `Imported ${res.data.imported} prices. ${res.data.alertsCreated} new alert${res.data.alertsCreated === 1 ? "" : "s"}.${res.data.skipped ? ` Skipped ${res.data.skipped} online, per-pound, or no-warehouse prices, which don't count against warehouse receipts.` : ""}`
     );
     setPriceText("");
   }
@@ -69,7 +69,7 @@ export function UploadPage() {
       return;
     }
     setNote(
-      `Imported ${res.data.imported} sample prices. ${res.data.alertsCreated} new alert${res.data.alertsCreated === 1 ? "" : "s"}.`
+      `Imported ${res.data.imported} sample prices. ${res.data.alertsCreated} new alert${res.data.alertsCreated === 1 ? "" : "s"}.${res.data.skipped ? ` Skipped ${res.data.skipped} online, per-pound, or no-warehouse prices, which don't count against warehouse receipts.` : ""}`
     );
   }
 

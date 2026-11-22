@@ -15,7 +15,7 @@ local:
 
 # Compare a receipt file to a price file
 refund:
-	yarn refund -- --receipt fixtures/sample-receipt.txt --prices fixtures/public-prices.csv --as-of 2026-11-15
+	yarn refund --receipt fixtures/sample-receipt.txt --prices fixtures/public-prices.csv --as-of 2026-11-15
 
 # Stop infrastructure
 stop:
@@ -31,8 +31,8 @@ typecheck:
 
 # Reset database (drop and recreate)
 db-reset:
-	docker compose exec -T postgres psql -U postgres -c "DROP DATABASE IF EXISTS costco_refunder;"
-	docker compose exec -T postgres psql -U postgres -c "CREATE DATABASE costco_refunder;"
+	docker compose exec -T postgres psql -U postgres -c "DROP DATABASE IF EXISTS receipt_rewind;"
+	docker compose exec -T postgres psql -U postgres -c "CREATE DATABASE receipt_rewind;"
 	yarn db:migrate
 	yarn db:seed
 

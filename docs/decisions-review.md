@@ -1,6 +1,8 @@
 # Decisions review
 
-Costco Refunder compares what you paid with a later price and tells you when a Costco price adjustment is still inside the posted window. The claim itself stays with you: the membership counter, or 1-800-774-2678. The app does not log into Costco and does not send the request for you.
+> Update, Nov 21, 2026: this project was renamed from Costco Refunder to Receipt Rewind, and several rules below were corrected after checking Costco's own pages. Price endings and category exclusions are now unofficial hints, warehouse and online prices never cross-match, and claims point to the Returns counter or Costco's online form instead of a phone line. The README's "Design decisions" and "Accuracy caveats" sections are the current source. The text below is the original review, kept for history.
+
+Receipt Rewind compares what you paid with a later price and tells you when a Costco price adjustment is still inside the posted window. The claim itself stays with you: the membership counter, or 1-800-774-2678. The app does not log into Costco and does not send the request for you.
 
 This note reviews the decisions already in the repo (README, schema, parser, API, and the six commits on main). There were no GitHub issues.
 
